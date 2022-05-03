@@ -6,18 +6,19 @@
 
 #include "z_boss_mo.h"
 #include "objects/object_mo/object_mo.h"
+#include "overlays/actors/ovl_Door_Warp1/z_door_warp1.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "vt.h"
 
-#define FLAGS 0x00000035
-
-#define THIS ((BossMo*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
 #define MO_WATER_LEVEL(globalCtx) globalCtx->colCtx.colHeader->waterBoxes[0].ySurface
 
 #define HAS_LINK(tent) \
     ((tent != NULL) && \
      ((tent->work[MO_TENT_ACTION_STATE] == MO_TENT_GRAB) || (tent->work[MO_TENT_ACTION_STATE] == MO_TENT_SHAKE)))
+
+#define BOSS_MO_EFFECT_COUNT 300
 
 typedef struct {
     /* 0x00 */ Vec3f pos;
@@ -141,7 +142,7 @@ static f32 sFlatWidth[41] = {
 
 #include "z_boss_mo_colchk.c"
 
-static BossMoEffect sEffects[300];
+static BossMoEffect sEffects[BOSS_MO_EFFECT_COUNT];
 static s32 sSeed1;
 static s32 sSeed2;
 static s32 sSeed3;
@@ -185,12 +186,12 @@ s32 BossMo_NearLand(Vec3f* pos, f32 margin) {
     return false;
 }
 
-void BossMo_SpawnRipple(BossMoEffect* effect, Vec3f* pos, f32 scale, f32 maxScale, s16 maxAlpha, s16 partLimit,
+void BossMo_SpawnRipple(BossMoEffect* effect, Vec3f* pos, f32 scale, f32 maxScale, s16 maxAlpha, s16 countLimit,
                         u8 type) {
     static Vec3f zeroVec = { 0.0f, 0.0f, 0.0f };
     s16 i;
 
-    for (i = 0; i < partLimit; i++, effect++) {
+    for (i = 0; i < countLimit; i++, effect++) {
         if (effect->type == MO_FX_NONE) {
             effect->stopTimer = 0;
             effect->type = type;
@@ -292,7 +293,7 @@ static s16 sAttackRot[41] = {
 
 static InitChainEntry sInitChain[] = {
     ICHAIN_U8(targetMode, 5, ICHAIN_CONTINUE),
-    ICHAIN_S8(naviEnemyId, 0x25, ICHAIN_CONTINUE),
+    ICHAIN_S8(naviEnemyId, NAVI_ENEMY_MORPHA, ICHAIN_CONTINUE),
     ICHAIN_F32_DIV1000(gravity, 0, ICHAIN_CONTINUE),
     ICHAIN_F32(targetArrowOffset, 0, ICHAIN_STOP),
 };
@@ -325,7 +326,7 @@ static f32 sDropletWidth[41] = {
 
 void BossMo_Init(Actor* thisx, GlobalContext* globalCtx2) {
     GlobalContext* globalCtx = globalCtx2;
-    BossMo* this = THIS;
+    BossMo* this = (BossMo*)thisx;
     u16 i;
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
@@ -334,9 +335,9 @@ void BossMo_Init(Actor* thisx, GlobalContext* globalCtx2) {
         Flags_SetSwitch(globalCtx, 0x14);
         sMorphaCore = this;
         MO_WATER_LEVEL(globalCtx) = this->waterLevel = MO_WATER_LEVEL(globalCtx);
-        globalCtx->unk_11D30[0] = 0xA0;
+        globalCtx->roomCtx.unk_74[0] = 0xA0;
         globalCtx->specialEffects = sEffects;
-        for (i = 0; i < ARRAY_COUNT(sEffects); i++) {
+        for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++) {
             sEffects[i].type = MO_FX_NONE;
         }
         this->actor.world.pos.x = 200.0f;
@@ -352,14 +353,14 @@ void BossMo_Init(Actor* thisx, GlobalContext* globalCtx2) {
         if (Flags_GetClear(globalCtx, globalCtx->roomCtx.curRoom.num)) {
             Actor_Kill(&this->actor);
             Actor_SpawnAsChild(&globalCtx->actorCtx, &this->actor, globalCtx, ACTOR_DOOR_WARP1, 0.0f, -280.0f, 0.0f, 0,
-                               0, 0, -1);
+                               0, 0, WARP_DUNGEON_ADULT);
             Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_ITEM_B_HEART, -200.0f, -280.0f, 0.0f, 0, 0, 0, 0);
-            globalCtx->unk_11D30[0] = 0xFF;
+            globalCtx->roomCtx.unk_74[0] = 0xFF;
             MO_WATER_LEVEL(globalCtx) = -500;
             return;
         }
-        if (gSaveContext.eventChkInf[7] & 0x10) {
-            Audio_QueueSeqCmd(0x1B);
+        if (GET_EVENTCHKINF(EVENTCHKINF_74)) {
+            Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS);
             this->tentMaxAngle = 5.0f;
             this->timers[0] = 50;
         } else {
@@ -390,7 +391,7 @@ void BossMo_Init(Actor* thisx, GlobalContext* globalCtx2) {
 
 void BossMo_Destroy(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossMo* this = THIS;
+    BossMo* this = (BossMo*)thisx;
 
     if (this->actor.params >= BOSSMO_TENTACLE) {
         Collider_DestroyJntSph(globalCtx, &this->tentCollider);
@@ -406,27 +407,26 @@ void BossMo_SetupTentacle(BossMo* this, GlobalContext* globalCtx) {
 }
 
 void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
-    // variables marked real are put on the stack and cannot be reordered
     s16 tentXrot;
-    s16 sp1B4 = 0; // real
+    s16 sp1B4 = 0;
     s32 buttons;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 indS0;
     s16 indS1;
     Camera* camera1;
     Camera* camera2;
-    BossMo* otherTent = (BossMo*)this->otherTent; // real
-    f32 maxSwingRateX;                            // real
-    f32 maxSwingLagX;                             // real
-    f32 maxSwingSizeX;                            // real
-    f32 maxSwingRateZ;                            // real
-    f32 maxSwingLagZ;                             // real
-    f32 maxSwingSizeZ;                            // real
-    f32 swingRateAccel;                           // real
-    f32 swingSizeAccel;                           // real
-    s16 rippleCount;                              // real
+    BossMo* otherTent = (BossMo*)this->otherTent;
+    f32 maxSwingRateX;
+    f32 maxSwingLagX;
+    f32 maxSwingSizeX;
+    f32 maxSwingRateZ;
+    f32 maxSwingLagZ;
+    f32 maxSwingSizeZ;
+    f32 swingRateAccel;
+    f32 swingSizeAccel;
+    s16 rippleCount;
     s16 indT5;
-    Vec3f ripplePos; // real
+    Vec3f ripplePos;
     f32 randAngle;
     f32 randFloat;
     f32 tempf1;
@@ -437,21 +437,21 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
     f32 dx;
     f32 dy;
     f32 dz;
-    Vec3f sp138; // real
-    Vec3f sp12C; // real
-    Vec3f sp120; // real
+    Vec3f sp138;
+    Vec3f sp12C;
+    Vec3f sp120;
     s32 pad11C;
     s32 pad118;
     s32 pad114;
     s32 pad110;
     s32 pad10C;
     s32 pad108;
-    Vec3f spFC; // real
-    Vec3f spF0; // real
+    Vec3f spFC;
+    Vec3f spF0;
     f32 padEC;
-    Vec3f spE0; // real
-    Vec3f spD4; // real
-    Vec3f spC8; // real
+    Vec3f spE0;
+    Vec3f spD4;
+    Vec3f spC8;
 
     if (this->work[MO_TENT_ACTION_STATE] <= MO_TENT_DEATH_3) {
         this->actor.world.pos.y = MO_WATER_LEVEL(globalCtx);
@@ -490,7 +490,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
             swingRateAccel = 30.0f;
             swingSizeAccel = 60.0f;
             if (((this->sfxTimer % 16) == 0) && (this->timers[0] < 30)) {
-                func_800F4B58(&this->tentTipPos, NA_SE_EN_MOFER_WAVE, D_801305D0);
+                Audio_PlaySoundIncreasinglyTransposed(&this->tentTipPos, NA_SE_EN_MOFER_WAVE, gMorphaTransposeTable);
             }
         } else if (this->work[MO_TENT_ACTION_STATE] == MO_TENT_SHAKE) {
             if (this->timers[0] > 40) {
@@ -503,7 +503,8 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                 swingRateAccel = 30.0f;
                 swingSizeAccel = 60.0f;
                 if ((this->sfxTimer % 32) == 0) {
-                    func_800F4B58(&this->tentTipPos, NA_SE_EN_MOFER_WAVE, D_801305D0);
+                    Audio_PlaySoundIncreasinglyTransposed(&this->tentTipPos, NA_SE_EN_MOFER_WAVE,
+                                                          gMorphaTransposeTable);
                     func_800AA000(0, 100, 5, 2);
                     func_8002F7DC(&player->actor, NA_SE_VO_LI_FREEZE + player->ageProperties->unk_92);
                 }
@@ -517,7 +518,8 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                 swingRateAccel = 70.0f;
                 swingSizeAccel = 70.0f;
                 if ((this->sfxTimer % 16) == 0) {
-                    func_800F4B58(&this->tentTipPos, NA_SE_EN_MOFER_WAVE, D_801305D0);
+                    Audio_PlaySoundIncreasinglyTransposed(&this->tentTipPos, NA_SE_EN_MOFER_WAVE,
+                                                          gMorphaTransposeTable);
                     func_800AA000(0, 160, 5, 4);
                     func_8002F7DC(&player->actor, NA_SE_VO_LI_FREEZE + player->ageProperties->unk_92);
                 }
@@ -552,7 +554,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
     }
     switch (this->work[MO_TENT_ACTION_STATE]) {
         case MO_TENT_WAIT:
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             if (this == sMorphaTent2) {
                 this->work[MO_TENT_ACTION_STATE] = MO_TENT_SPAWN;
                 this->timers[0] = 70;
@@ -630,7 +632,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                 if ((this->timers[0] == 0) && !HAS_LINK(otherTent)) {
                     this->work[MO_TENT_ACTION_STATE] = MO_TENT_SWING;
                     this->timers[0] = 50;
-                    func_800F4BE8();
+                    Audio_ResetIncreasingTranspose();
                     this->attackAngleMod = Rand_CenteredFloat(0x1000);
                 }
             } else {
@@ -646,7 +648,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
             }
             break;
         case MO_TENT_ATTACK:
-            this->actor.flags |= 0x1000000;
+            this->actor.flags |= ACTOR_FLAG_24;
             func_80078914(&this->tentTipPos, NA_SE_EN_MOFER_ATTACK - SFX_FLAG);
             Math_ApproachF(&this->waterLevelMod, -5.0f, 0.1f, 0.4f);
             for (indS1 = 0; indS1 < 41; indS1++) {
@@ -730,8 +732,9 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                         player->actor.parent = &this->actor;
                         this->work[MO_TENT_ACTION_STATE] = MO_TENT_GRAB;
                         func_80078914(&this->tentTipPos, NA_SE_EN_MOFER_CATCH);
-                        Audio_PlaySoundGeneral(NA_SE_VO_LI_DAMAGE_S, &player->actor.projectedPos, 4, &D_801333E0,
-                                               &D_801333E0, &D_801333E8);
+                        Audio_PlaySoundGeneral(NA_SE_VO_LI_DAMAGE_S, &player->actor.projectedPos, 4,
+                                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                               &gSfxDefaultReverb);
                     } else {
                         this->work[MO_TENT_ACTION_STATE] = MO_TENT_READY;
                         this->tentMaxAngle = .001f;
@@ -772,7 +775,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                     this->timers[0] = 150;
                     this->mashCounter = 0;
                     this->sfxTimer = 30;
-                    func_800F4BE8();
+                    Audio_ResetIncreasingTranspose();
                     func_80064520(globalCtx, &globalCtx->csCtx);
                     this->csCamera = Gameplay_CreateSubCamera(globalCtx);
                     Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_WAIT);
@@ -916,7 +919,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
             Math_ApproachF(&this->tentMaxAngle, 0.5f, 1.0f, 0.01);
             Math_ApproachF(&this->tentSpeed, 320.0f, 1.0f, 50.0f);
             if (this->timers[0] == 0) {
-                this->actor.flags &= ~1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
                 Math_ApproachF(&this->baseAlpha, 0.0, 1.0f, 5.0f);
                 for (indS1 = 0; indS1 < 40; indS1++) {
                     if (sMorphaTent2->tentSpawnPos) {}
@@ -925,7 +928,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                     spFC.x = 0;
                     spFC.y = 0;
                     spFC.z = 0;
-                    Matrix_RotateY((player->actor.world.rot.y / (f32)0x8000) * M_PI, MTXMODE_NEW);
+                    Matrix_RotateY(BINANG_TO_RAD_ALT(player->actor.world.rot.y), MTXMODE_NEW);
                     Matrix_MultVec3f(&spFC, &spF0);
                     spF0.x = player->actor.world.pos.x + spF0.x;
                     spF0.z = player->actor.world.pos.z + spF0.z;
@@ -961,7 +964,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
             }
             break;
         case MO_TENT_DESPAWN:
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             Math_ApproachF(&this->baseAlpha, 0, 1.0f, 5.0f);
             if ((this->baseAlpha <= 0.5f) && (this->timers[0] == 0)) {
                 this->meltIndex = 0;
@@ -988,7 +991,7 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
         case MO_TENT_DEATH_3:
             this->baseBubblesTimer = 20;
             Math_ApproachF(&sMorphaCore->waterLevel, -300.0f, 0.1f, 0.8f);
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             for (indS1 = 0; indS1 < 41; indS1++) {
                 sin = Math_SinS(((s16)this->fwork[MO_TENT_SWING_LAG_X] * indS1) + this->xSwing);
                 tempf1 = this->fwork[MO_TENT_SWING_SIZE_X] * (indS1 * 0.025f * sin);
@@ -1097,10 +1100,11 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
                                             ((300 - indS1) * .0015f) + 0.13f);
                     }
                     Actor_SpawnAsChild(&globalCtx->actorCtx, &this->actor, globalCtx, ACTOR_DOOR_WARP1,
-                                       this->actor.world.pos.x, -280.0f, this->actor.world.pos.z, 0, 0, 0, -1);
+                                       this->actor.world.pos.x, -280.0f, this->actor.world.pos.z, 0, 0, 0,
+                                       WARP_DUNGEON_ADULT);
                     Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_ITEM_B_HEART, this->actor.world.pos.x + 200.0f,
                                 -280.0f, this->actor.world.pos.z, 0, 0, 0, 0);
-                    Audio_QueueSeqCmd(0x21);
+                    Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS_CLEAR);
                     Flags_SetClear(globalCtx, globalCtx->roomCtx.curRoom.num);
                 }
             }
@@ -1113,8 +1117,8 @@ void BossMo_Tentacle(BossMo* this, GlobalContext* globalCtx) {
          (this->work[MO_TENT_ACTION_STATE] == MO_TENT_DEATH_2) || (this->work[MO_TENT_ACTION_STATE] == MO_TENT_CURL) ||
          (this->work[MO_TENT_ACTION_STATE] == MO_TENT_GRAB)) &&
         (Rand_ZeroOne() < 0.8f) && (this->actor.scale.x > 0.001f)) {
-        Vec3f pos;                             // real
-        Vec3f velocity = { 0.0f, 0.0f, 0.0f }; // real
+        Vec3f pos;
+        Vec3f velocity = { 0.0f, 0.0f, 0.0f };
         f32 scale;
         f32 temp;
 
@@ -1196,7 +1200,7 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
     f32 sp80;
     f32 sp7C;
     f32 sp78;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Camera* camera = Gameplay_GetCamera(globalCtx, MAIN_CAM);
     Vec3f bubblePos;
     Vec3f bubblePos2;
@@ -1211,7 +1215,7 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
     switch (this->csState) {
         case MO_INTRO_WAIT:
             if (this->timers[0] == 1) {
-                func_8010B680(globalCtx, 0x403F, NULL);
+                Message_StartTextbox(globalCtx, 0x403F, NULL);
             }
             if (((fabsf(player->actor.world.pos.z - 180.0f) < 40.0f) &&
                  (fabsf(player->actor.world.pos.x - 180.0f) < 40.0f)) ||
@@ -1234,8 +1238,8 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
                 this->actor.world.rot.y = 0x721A;
                 sMorphaTent1->work[MO_TENT_ACTION_STATE] = MO_TENT_READY;
                 sMorphaTent1->timers[0] = 30000;
-                Audio_QueueSeqCmd(0x103200FF);
-                func_80106CCC(globalCtx);
+                Audio_QueueSeqCmd(0x1 << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0x3200FF);
+                Message_CloseTextbox(globalCtx);
             } else {
                 break;
             }
@@ -1276,8 +1280,8 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
             dz = this->targetPos.z - this->cameraEye.z;
             tempY = Math_FAtan2F(dx, dz);
             tempX = Math_FAtan2F(dy, sqrtf(SQ(dx) + SQ(dz)));
-            Math_ApproachS(&this->actor.world.rot.y, tempY * (0x8000 / M_PI), 5, this->cameraYawRate);
-            Math_ApproachS(&this->actor.world.rot.x, tempX * (0x8000 / M_PI), 5, this->cameraYawRate);
+            Math_ApproachS(&this->actor.world.rot.y, RAD_TO_BINANG(tempY), 5, this->cameraYawRate);
+            Math_ApproachS(&this->actor.world.rot.x, RAD_TO_BINANG(tempX), 5, this->cameraYawRate);
             if (this->work[MO_TENT_MOVE_TIMER] == 150) {
                 this->cameraAtVel.x = fabsf(this->cameraAt.x - player->actor.world.pos.x);
                 this->cameraAtVel.y = fabsf(this->cameraAt.y - player->actor.world.pos.y);
@@ -1348,8 +1352,8 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
                 this->cameraZoom = 60.0f;
                 this->actor.world.pos = sMorphaTent1->actor.world.pos;
                 this->work[MO_TENT_ACTION_STATE] = MO_CORE_INTRO_REVEAL;
-                this->actor.flags &= ~1;
-                sMorphaTent1->actor.flags |= 1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
+                sMorphaTent1->actor.flags |= ACTOR_FLAG_0;
             } else {
                 sMorphaTent1->xSwing = 0xCEC;
                 sMorphaTent1->fwork[MO_TENT_SWING_RATE_X] = 0.0f;
@@ -1415,12 +1419,12 @@ void BossMo_IntroCs(BossMo* this, GlobalContext* globalCtx) {
                 this->cameraAccel = 0.01f;
             }
             if (this->timers[2] == 150) {
-                Audio_QueueSeqCmd(0x1B);
+                Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS);
             }
             if (this->timers[2] == 130) {
                 TitleCard_InitBossName(globalCtx, &globalCtx->actorCtx.titleCtx,
                                        SEGMENTED_TO_VIRTUAL(gMorphaTitleCardTex), 0xA0, 0xB4, 0x80, 0x28);
-                gSaveContext.eventChkInf[7] |= 0x10;
+                SET_EVENTCHKINF(EVENTCHKINF_74);
             }
             break;
         case MO_INTRO_FINISH:
@@ -1557,9 +1561,9 @@ void BossMo_DeathCs(BossMo* this, GlobalContext* globalCtx) {
                                         Rand_ZeroFloat(0.08f) + 0.13f);
                 }
                 this->drawActor = false;
-                this->actor.flags &= ~1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
                 Audio_PlayActorSound2(&this->actor, NA_SE_EN_MOFER_CORE_JUMP);
-                Audio_PlaySoundAtPosition(globalCtx, &this->actor.world.pos, 70, NA_SE_EN_MOFER_LASTVOICE);
+                SoundSource_PlaySfxAtFixedWorldPos(globalCtx, &this->actor.world.pos, 70, NA_SE_EN_MOFER_LASTVOICE);
             }
             if (this->timers[0] == 0) {
                 this->csState = MO_DEATH_DRAIN_WATER_1;
@@ -1698,9 +1702,9 @@ void BossMo_DeathCs(BossMo* this, GlobalContext* globalCtx) {
         }
     }
     if (sMorphaCore->waterLevel < -200.0f) {
-        globalCtx->unk_11D30[0]++;
-        if (globalCtx->unk_11D30[0] >= 0xFF) {
-            globalCtx->unk_11D30[0] = 0xFF;
+        globalCtx->roomCtx.unk_74[0]++;
+        if (globalCtx->roomCtx.unk_74[0] >= 0xFF) {
+            globalCtx->roomCtx.unk_74[0] = 0xFF;
         }
     }
     if (sMorphaCore->waterLevel < -250.0f) {
@@ -1728,7 +1732,7 @@ void BossMo_DeathCs(BossMo* this, GlobalContext* globalCtx) {
 
 void BossMo_CoreCollisionCheck(BossMo* this, GlobalContext* globalCtx) {
     s16 i;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     osSyncPrintf(VT_FGCOL(YELLOW));
     osSyncPrintf("Core_Damage_check START\n");
@@ -1741,19 +1745,19 @@ void BossMo_CoreCollisionCheck(BossMo* this, GlobalContext* globalCtx) {
     }
     if (this->coreCollider.base.acFlags & AC_HIT) {
         ColliderInfo* hurtbox = this->coreCollider.info.acHitInfo;
-        // hit!!
+        // "hit!!"
         osSyncPrintf("Core_Damage_check 当り！！\n");
         this->coreCollider.base.acFlags &= ~AC_HIT;
         if ((hurtbox->toucher.dmgFlags & 0x00020000) && (this->work[MO_TENT_ACTION_STATE] == MO_CORE_ATTACK)) {
             this->work[MO_TENT_ACTION_STATE] = MO_CORE_RETREAT;
         }
-        // hit 2 !!
+        // "hit 2 !!"
         osSyncPrintf("Core_Damage_check 当り 2 ！！\n");
         if ((this->work[MO_TENT_ACTION_STATE] != MO_CORE_UNDERWATER) && (this->work[MO_TENT_INVINC_TIMER] == 0)) {
             u8 damage = CollisionCheck_GetSwordDamage(hurtbox->toucher.dmgFlags);
 
             if ((damage != 0) && (this->work[MO_TENT_ACTION_STATE] < MO_CORE_ATTACK)) {
-                // sword hit !!
+                // "sword hit !!"
                 osSyncPrintf("Core_Damage_check 剣 当り！！\n");
                 this->work[MO_TENT_ACTION_STATE] = MO_CORE_STUNNED;
                 this->timers[0] = 25;
@@ -1769,7 +1773,7 @@ void BossMo_CoreCollisionCheck(BossMo* this, GlobalContext* globalCtx) {
                     if (((sMorphaTent1->csCamera == 0) && (sMorphaTent2 == NULL)) ||
                         ((sMorphaTent1->csCamera == 0) && (sMorphaTent2 != NULL) && (sMorphaTent2->csCamera == 0))) {
                         Enemy_StartFinishingBlow(globalCtx, &this->actor);
-                        Audio_QueueSeqCmd(0x100100FF);
+                        Audio_QueueSeqCmd(0x1 << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0x100FF);
                         this->csState = MO_DEATH_START;
                         sMorphaTent1->drawActor = false;
                         sMorphaTent1->work[MO_TENT_ACTION_STATE] = MO_TENT_DEATH_START;
@@ -1795,7 +1799,7 @@ void BossMo_CoreCollisionCheck(BossMo* this, GlobalContext* globalCtx) {
                     sMorphaTent1->cutScale = 1.0f;
                     sMorphaTent1->work[MO_TENT_ACTION_STATE] = MO_TENT_CUT;
                     sMorphaTent1->timers[0] = 40;
-                    sMorphaTent1->actor.flags &= ~1;
+                    sMorphaTent1->actor.flags &= ~ACTOR_FLAG_0;
                     if (player->actor.parent == &sMorphaTent1->actor) {
                         player->unk_850 = 0x65;
                         player->actor.parent = NULL;
@@ -1822,7 +1826,7 @@ void BossMo_CoreCollisionCheck(BossMo* this, GlobalContext* globalCtx) {
             }
         }
     }
-    // end !!
+    // "end !!"
     osSyncPrintf("Core_Damage_check 終わり ！！\n");
     osSyncPrintf(VT_RST);
 }
@@ -1832,8 +1836,8 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
         0.1f, 0.15f, 0.2f, 0.3f, 0.4f, 0.43f, 0.4f, 0.3f, 0.2f, 0.15f, 0.1f,
     };
     u8 nearLand;
-    s16 i;                   // not on stack
-    Player* player = PLAYER; // not on stack
+    s16 i;                                  // not on stack
+    Player* player = GET_PLAYER(globalCtx); // not on stack
     f32 spDC;
     f32 spD8;
     f32 spD4;
@@ -1869,7 +1873,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
     if ((this->csState != MO_BATTLE) && (this->csState < MO_DEATH_START)) {
         BossMo_IntroCs(this, globalCtx);
         if (this->work[MO_TENT_ACTION_STATE] == MO_CORE_INTRO_WAIT) {
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             return;
         }
     } else if (this->csState >= MO_DEATH_START) {
@@ -1902,7 +1906,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
     }
     switch (this->work[MO_TENT_ACTION_STATE]) {
         case MO_CORE_MOVE:
-            this->actor.flags |= 1;
+            this->actor.flags |= ACTOR_FLAG_0;
             if ((this->timers[0] == 0) &&
                 ((sMorphaTent1->work[MO_TENT_ACTION_STATE] == MO_TENT_WAIT) ||
                  (sMorphaTent1->work[MO_TENT_ACTION_STATE] == MO_TENT_READY)) &&
@@ -1941,7 +1945,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
             }
             break;
         case MO_CORE_STUNNED:
-            this->actor.flags |= 1;
+            this->actor.flags |= ACTOR_FLAG_0;
             if (this->timers[0] == 0) {
                 this->work[MO_TENT_ACTION_STATE] = MO_CORE_MOVE;
                 this->timers[0] = 30;
@@ -1958,7 +1962,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
     if (this->timers[0] == 0) {
         switch (this->work[MO_TENT_ACTION_STATE]) {
             case MO_CORE_ATTACK:
-                this->actor.flags |= 1;
+                this->actor.flags |= ACTOR_FLAG_0;
                 this->work[MO_CORE_POS_IN_TENT]++;
                 if (sMorphaTent1->work[MO_TENT_ACTION_STATE] == MO_TENT_ATTACK) {
                     temp = (s16)(Math_SinS(this->work[MO_TENT_MOVE_TIMER] * 0x300) * 10.0f) + 15;
@@ -1983,7 +1987,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
                 this->timers[0] = 0;
                 break;
             case MO_CORE_INTRO_REVEAL:
-                this->actor.flags &= ~1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
                 this->work[MO_CORE_POS_IN_TENT]++;
                 temp = (s16)(Math_SinS(this->work[MO_TENT_MOVE_TIMER] * 0x500) * 10.0f) + 15;
                 if (this->work[MO_CORE_POS_IN_TENT] >= temp) {
@@ -2041,7 +2045,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
             (this->work[MO_TENT_ACTION_STATE] == MO_CORE_STUNNED)) {
             this->actor.world.pos.y += this->actor.velocity.y;
             this->actor.velocity.y -= 1.0f;
-            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 20.0f, 100.0f, 1);
+            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 20.0f, 100.0f, UPDBGCHECKINFO_FLAG_0);
             effectVelocity.x = effectVelocity.y = effectVelocity.z = 0.0f;
             for (i = 0; i < 1; i++) {
                 effectPos.x = Rand_CenteredFloat(20.0f) + this->actor.world.pos.x;
@@ -2100,7 +2104,7 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
                             sp70.x = 0.0f;
                             sp70.y = 0.0f;
                             sp70.z = 100.0f;
-                            Matrix_RotateY((player->actor.world.rot.y / (f32)0x8000) * M_PI, MTXMODE_NEW);
+                            Matrix_RotateY(BINANG_TO_RAD_ALT(player->actor.world.rot.y), MTXMODE_NEW);
                             Matrix_MultVec3f(&sp70, &sp64);
                             this->targetPos.x = player->actor.world.pos.x + sp64.x;
                             this->targetPos.y = player->actor.world.pos.y + 30.0f;
@@ -2129,8 +2133,8 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
                 spDC = this->targetPos.x - this->actor.world.pos.x;
                 spD8 = this->targetPos.y - this->actor.world.pos.y;
                 spD4 = this->targetPos.z - this->actor.world.pos.z;
-                spCC = (s16)(Math_FAtan2F(spDC, spD4) * (0x8000 / M_PI));
-                spD0 = (s16)(Math_FAtan2F(spD8, sqrtf(SQ(spDC) + SQ(spD4))) * (0x8000 / M_PI));
+                spCC = RAD_TO_BINANG(Math_FAtan2F(spDC, spD4));
+                spD0 = RAD_TO_BINANG(Math_FAtan2F(spD8, sqrtf(SQ(spDC) + SQ(spD4))));
                 Math_ApproachS(&this->actor.world.rot.y, spCC, this->tentMaxAngle, this->tentSpeed);
                 Math_ApproachS(&this->actor.world.rot.x, spD0, this->tentMaxAngle, this->tentSpeed);
                 func_8002D908(&this->actor);
@@ -2139,7 +2143,8 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
                 this->actor.velocity.y -= 1.0f;
             }
             func_8002D7EC(&this->actor);
-            temp = (this->actor.world.pos.y < -200.0f) ? 5 : 1;
+            temp = (this->actor.world.pos.y < -200.0f) ? UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2
+                                                       : UPDBGCHECKINFO_FLAG_0;
             this->actor.world.pos.y -= 20.0f;
             Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 20.0f, 100.0f, temp);
             this->actor.world.pos.y += 20.0f;
@@ -2201,9 +2206,9 @@ void BossMo_Core(BossMo* this, GlobalContext* globalCtx) {
 
 void BossMo_UpdateCore(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossMo* this = THIS;
+    BossMo* this = (BossMo*)thisx;
     s16 i;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     osSyncPrintf("CORE mode = <%d>\n", this->work[MO_TENT_ACTION_STATE]);
     if (sMorphaTent2 == NULL) {
@@ -2211,7 +2216,7 @@ void BossMo_UpdateCore(Actor* thisx, GlobalContext* globalCtx) {
     } else {
         MO_WATER_LEVEL(globalCtx) = sMorphaTent2->waterLevelMod + ((s16)this->waterLevel + sMorphaTent1->waterLevelMod);
     }
-    this->actor.flags |= 0x200;
+    this->actor.flags |= ACTOR_FLAG_9;
     this->actor.focus.pos = this->actor.world.pos;
     this->work[MO_TENT_VAR_TIMER]++;
 
@@ -2240,7 +2245,7 @@ void BossMo_UpdateCore(Actor* thisx, GlobalContext* globalCtx) {
     }
     BossMo_UpdateEffects(this, globalCtx);
     if (player->actor.parent != NULL) {
-        this->actor.flags &= ~1;
+        this->actor.flags &= ~ACTOR_FLAG_0;
     }
     BossMo_Unknown();
 }
@@ -2249,8 +2254,8 @@ void BossMo_UpdateTent(Actor* thisx, GlobalContext* globalCtx) {
     s16 i;
     s16 index;
     s32 pad;
-    BossMo* this = THIS;
-    Player* player = PLAYER;
+    BossMo* this = (BossMo*)thisx;
+    Player* player = GET_PLAYER(globalCtx);
     f32 phi_f0;
 
     if ((this == sMorphaTent2) && (this->tent2KillTimer != 0)) {
@@ -2258,13 +2263,14 @@ void BossMo_UpdateTent(Actor* thisx, GlobalContext* globalCtx) {
         this->actor.draw = NULL;
         if (this->tent2KillTimer > 20) {
             Actor_Kill(&this->actor);
-            func_800F89E8(&this->tentTipPos);
+            Audio_StopSfxByPos(&this->tentTipPos);
             sMorphaTent2 = NULL;
         }
         return;
     }
 
-    SkinMatrix_Vec3fMtxFMultXYZW(&globalCtx->mf_11D60, &this->tentPos[40], &this->tentTipPos, &this->actor.projectedW);
+    SkinMatrix_Vec3fMtxFMultXYZW(&globalCtx->viewProjectionMtxF, &this->tentPos[40], &this->tentTipPos,
+                                 &this->actor.projectedW);
     osSyncPrintf("MO : Move mode = <%d>\n", this->work[MO_TENT_ACTION_STATE]);
     Math_ApproachS(&player->actor.shape.rot.x, 0, 5, 0x3E8);
     Math_ApproachS(&player->actor.shape.rot.z, 0, 5, 0x3E8);
@@ -2434,9 +2440,9 @@ void BossMo_DrawTentacle(BossMo* this, GlobalContext* globalCtx) {
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_boss_mo.c", 6366);
 
-    sp110.x = globalCtx->envCtx.unk_2A;
-    sp110.y = globalCtx->envCtx.unk_2B;
-    sp110.z = globalCtx->envCtx.unk_2C;
+    sp110.x = globalCtx->envCtx.dirLight1.params.dir.x;
+    sp110.y = globalCtx->envCtx.dirLight1.params.dir.y;
+    sp110.z = globalCtx->envCtx.dirLight1.params.dir.z;
 
     Matrix_Push();
 
@@ -2445,8 +2451,8 @@ void BossMo_DrawTentacle(BossMo* this, GlobalContext* globalCtx) {
     gSPSegment(POLY_XLU_DISP++, 0x0C, matrix);
 
     Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
-    Matrix_RotateY((this->actor.shape.rot.y / (f32)0x8000) * M_PI, MTXMODE_APPLY);
-    Matrix_RotateX((this->actor.shape.rot.x / (f32)0x8000) * M_PI, MTXMODE_APPLY);
+    Matrix_RotateY(BINANG_TO_RAD_ALT(this->actor.shape.rot.y), MTXMODE_APPLY);
+    Matrix_RotateX(BINANG_TO_RAD_ALT(this->actor.shape.rot.x), MTXMODE_APPLY);
 
     BossMo_InitRand(1, 29100, 9786);
 
@@ -2461,8 +2467,8 @@ void BossMo_DrawTentacle(BossMo* this, GlobalContext* globalCtx) {
         } else {
             if (i >= 3) {
                 Matrix_Translate(0.0f, this->tentStretch[i - 2].y, 0.0f, MTXMODE_APPLY);
-                Matrix_RotateX((this->tentRot[i - 2].x / (f32)0x8000) * M_PI, MTXMODE_APPLY);
-                Matrix_RotateZ((this->tentRot[i - 2].z / (f32)0x8000) * M_PI, MTXMODE_APPLY);
+                Matrix_RotateX(BINANG_TO_RAD_ALT(this->tentRot[i - 2].x), MTXMODE_APPLY);
+                Matrix_RotateZ(BINANG_TO_RAD_ALT(this->tentRot[i - 2].z), MTXMODE_APPLY);
             }
             Matrix_Push();
             Matrix_Scale((this->tentScale[i - 2].x + this->tentRipple[i - 2].x) * this->actor.scale.x,
@@ -2512,7 +2518,7 @@ void BossMo_DrawTentacle(BossMo* this, GlobalContext* globalCtx) {
             Matrix_Translate(((BossMo_RandZeroOne() - 0.5f) * 10.0f) * this->tentScale[i - 2].x,
                              ((BossMo_RandZeroOne() - 0.5f) * 3.0f) + phi_f20,
                              ((BossMo_RandZeroOne() - 0.5f) * 10.0f) * this->tentScale[i - 2].z, MTXMODE_APPLY);
-            func_800D1FD4(&globalCtx->mf_11DA0);
+            Matrix_ReplaceRotation(&globalCtx->billboardMtxF);
             Matrix_Scale(phi_f22, phi_f22, 1.0f, MTXMODE_APPLY);
 
             gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(globalCtx->state.gfxCtx, "../z_boss_mo.c", 6511),
@@ -2539,7 +2545,7 @@ void BossMo_DrawTentacle(BossMo* this, GlobalContext* globalCtx) {
             Matrix_MultVec3f(&sp8C, &this->grabPosRot.pos);
             Matrix_RotateX(-35 * M_PI / 64, MTXMODE_APPLY);
             Matrix_Get(&sp98);
-            func_800D20CC(&sp98, &sp84, 0);
+            Matrix_MtxFToYXZRotS(&sp98, &sp84, 0);
             this->grabPosRot.rot.x = sp84.x;
             this->grabPosRot.rot.y = sp84.y;
             this->grabPosRot.rot.z = sp84.z;
@@ -2586,7 +2592,7 @@ void BossMo_DrawWater(BossMo* this, GlobalContext* globalCtx) {
 
 void BossMo_DrawCore(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossMo* this = THIS;
+    BossMo* this = (BossMo*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_boss_mo.c", 6688);
     if (this->actor.world.pos.y > MO_WATER_LEVEL(globalCtx)) {
@@ -2714,7 +2720,7 @@ void BossMo_DrawCore(Actor* thisx, GlobalContext* globalCtx) {
 
 void BossMo_DrawTent(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossMo* this = THIS;
+    BossMo* this = (BossMo*)thisx;
     u16 scroll;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_boss_mo.c", 6958);
@@ -2748,7 +2754,7 @@ void BossMo_UpdateEffects(BossMo* this, GlobalContext* globalCtx) {
     Vec3f bubbleSpeed = { 0.0f, 0.0f, 0.0f };
     Vec3f bubbleVel;
 
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (effect->type != MO_FX_NONE) {
             effect->timer++;
             if (effect->stopTimer == 0) {
@@ -2893,7 +2899,7 @@ void BossMo_UpdateEffects(BossMo* this, GlobalContext* globalCtx) {
 }
 
 void BossMo_DrawEffects(BossMoEffect* effect, GlobalContext* globalCtx) {
-    u8 flag = 0;
+    u8 materialFlag = 0;
     s16 i;
     s32 pad;
     GraphicsContext* gfxCtx = globalCtx->state.gfxCtx;
@@ -2902,14 +2908,14 @@ void BossMo_DrawEffects(BossMoEffect* effect, GlobalContext* globalCtx) {
     OPEN_DISPS(gfxCtx, "../z_boss_mo.c", 7264);
     Matrix_Push();
 
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (effect->type == MO_FX_BIG_RIPPLE) {
-            if (flag == 0) {
+            if (materialFlag == 0) {
                 func_80094BC4(gfxCtx);
 
                 gDPSetEnvColor(POLY_XLU_DISP++, 155, 155, 255, 0);
 
-                flag++;
+                materialFlag++;
             }
 
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, effect->alpha);
@@ -2924,15 +2930,15 @@ void BossMo_DrawEffects(BossMoEffect* effect, GlobalContext* globalCtx) {
     }
 
     effect = effectHead;
-    flag = 0;
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    materialFlag = 0;
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (effect->type == MO_FX_SMALL_RIPPLE) {
-            if (flag == 0) {
+            if (materialFlag == 0) {
                 func_80093D84(globalCtx->state.gfxCtx);
 
                 gDPSetEnvColor(POLY_XLU_DISP++, 155, 155, 255, 0);
 
-                flag++;
+                materialFlag++;
             }
 
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, effect->alpha);
@@ -2947,46 +2953,46 @@ void BossMo_DrawEffects(BossMoEffect* effect, GlobalContext* globalCtx) {
     }
 
     effect = effectHead;
-    flag = 0;
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    materialFlag = 0;
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (((effect->type == MO_FX_DROPLET) || (effect->type == MO_FX_SPLASH)) ||
             (effect->type == MO_FX_SPLASH_TRAIL)) {
-            if (flag == 0) {
+            if (materialFlag == 0) {
                 POLY_XLU_DISP = Gfx_CallSetupDL(POLY_XLU_DISP, 0);
 
                 gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(gDust1Tex));
-                gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletSetupDL);
+                gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletMaterialDL);
                 gDPSetEnvColor(POLY_XLU_DISP++, 250, 250, 255, 0);
 
-                flag++;
+                materialFlag++;
             }
 
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, (s16)effect->fwork[MO_FX_SHIMMER], (s16)effect->fwork[MO_FX_SHIMMER],
                             255, effect->alpha);
 
             Matrix_Translate(effect->pos.x, effect->pos.y, effect->pos.z, MTXMODE_NEW);
-            func_800D1FD4(&globalCtx->mf_11DA0);
+            Matrix_ReplaceRotation(&globalCtx->billboardMtxF);
             Matrix_Scale(effect->scale / effect->fwork[MO_FX_STRETCH], effect->fwork[MO_FX_STRETCH] * effect->scale,
                          1.0f, MTXMODE_APPLY);
             gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(gfxCtx, "../z_boss_mo.c", 7373),
                       G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
-            gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletVtxDL);
+            gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletModelDL);
         }
     }
 
     effect = effectHead;
-    flag = 0;
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    materialFlag = 0;
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (effect->type == MO_FX_WET_SPOT) {
-            if (flag == 0) {
+            if (materialFlag == 0) {
                 func_80094044(gfxCtx);
 
                 gSPSegment(POLY_XLU_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(gDust1Tex));
                 gDPSetEnvColor(POLY_XLU_DISP++, 250, 250, 255, 0);
-                gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletSetupDL);
+                gSPDisplayList(POLY_XLU_DISP++, gMorphaDropletMaterialDL);
 
-                flag++;
+                materialFlag++;
             }
 
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, (s16)effect->fwork[MO_FX_SHIMMER], (s16)effect->fwork[MO_FX_SHIMMER],
@@ -2997,26 +3003,26 @@ void BossMo_DrawEffects(BossMoEffect* effect, GlobalContext* globalCtx) {
             gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(gfxCtx, "../z_boss_mo.c", 7441),
                       G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
 
-            gSPDisplayList(POLY_XLU_DISP++, gMorphaWetSpotVtxDL);
+            gSPDisplayList(POLY_XLU_DISP++, gMorphaWetSpotModelDL);
         }
     }
 
     effect = effectHead;
-    flag = 0;
-    for (i = 0; i < ARRAY_COUNT(sEffects); i++, effect++) {
+    materialFlag = 0;
+    for (i = 0; i < BOSS_MO_EFFECT_COUNT; i++, effect++) {
         if (effect->type == MO_FX_BUBBLE) {
-            if (flag == 0) {
+            if (materialFlag == 0) {
                 func_80093D18(globalCtx->state.gfxCtx);
 
                 gDPSetEnvColor(POLY_OPA_DISP++, 150, 150, 150, 0);
 
-                flag++;
+                materialFlag++;
             }
 
             gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 255, 255, 255, effect->alpha);
 
             Matrix_Translate(effect->pos.x, effect->pos.y, effect->pos.z, MTXMODE_NEW);
-            func_800D1FD4(&globalCtx->mf_11DA0);
+            Matrix_ReplaceRotation(&globalCtx->billboardMtxF);
             Matrix_Scale(effect->scale, effect->scale, 1.0f, MTXMODE_APPLY);
             gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(gfxCtx, "../z_boss_mo.c", 7476),
                       G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
@@ -3569,11 +3575,11 @@ void BossMo_Unknown(void) {
 
     if (BREG(32) != 0) {
         BREG(32)--;
-        Audio_QueueSeqCmd(0x100100FF);
+        Audio_QueueSeqCmd(0x1 << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0x100FF);
         func_80078914(&zeroVec, unkSfx[BREG(33)]);
     }
     if (BREG(34) != 0) {
         BREG(34) = 0;
-        Audio_QueueSeqCmd((u16)BREG(35));
+        Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | (u16)BREG(35));
     }
 }

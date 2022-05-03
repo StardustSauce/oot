@@ -6,10 +6,7 @@
 
 #include "global.h"
 #include "alloca.h"
-
-extern Gfx D_01002720[];
-extern u8 D_01001800[];
-extern u8 D_01000000[];
+#include "textures/nintendo_rogo_static/nintendo_rogo_static.h"
 
 void Title_PrintBuildInfo(Gfx** gfxp) {
     Gfx* g;
@@ -36,7 +33,7 @@ void Title_PrintBuildInfo(Gfx** gfxp) {
 // Note: In other rom versions this function also updates unk_1D4, coverAlpha, addAlpha, visibleDuration to calculate
 // the fade-in/fade-out + the duration of the n64 logo animation
 void Title_Calc(TitleContext* this) {
-    this->exit = 1;
+    this->exit = true;
 }
 
 void Title_SetupView(TitleContext* this, f32 x, f32 y, f32 z) {
@@ -52,9 +49,9 @@ void Title_SetupView(TitleContext* this, f32 x, f32 y, f32 z) {
     lookAt.x = lookAt.y = lookAt.z = 0.0f;
     up.y = 1.0f;
 
-    func_800AA460(view, 30.0f, 10.0f, 12800.0f);
-    func_800AA358(view, &eye, &lookAt, &up);
-    func_800AAA50(view, 0xF);
+    View_SetPerspective(view, 30.0f, 10.0f, 12800.0f);
+    View_LookAt(view, &eye, &lookAt, &up);
+    View_Apply(view, VIEW_ALL);
 }
 
 void Title_Draw(TitleContext* this) {
@@ -87,10 +84,10 @@ void Title_Draw(TitleContext* this) {
     func_80093D18(this->state.gfxCtx);
     Matrix_Translate(-53.0, -5.0, 0, MTXMODE_NEW);
     Matrix_Scale(1.0, 1.0, 1.0, MTXMODE_APPLY);
-    Matrix_RotateRPY(0, sTitleRotY, 0, MTXMODE_APPLY);
+    Matrix_RotateZYX(0, sTitleRotY, 0, MTXMODE_APPLY);
 
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(this->state.gfxCtx, "../z_title.c", 424), G_MTX_LOAD);
-    gSPDisplayList(POLY_OPA_DISP++, &D_01002720);
+    gSPDisplayList(POLY_OPA_DISP++, gNintendo64LogoDL);
     func_800944C4(this->state.gfxCtx);
     gDPPipeSync(POLY_OPA_DISP++);
     gDPSetCycleType(POLY_OPA_DISP++, G_CYC_2CYCLE);
@@ -100,19 +97,20 @@ void Title_Draw(TitleContext* this) {
     gDPSetPrimColor(POLY_OPA_DISP++, 0, 0, 170, 255, 255, 255);
     gDPSetEnvColor(POLY_OPA_DISP++, 0, 0, 255, 128);
 
-    gDPLoadMultiBlock(POLY_OPA_DISP++, &D_01001800, 0x100, 1, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0,
+    gDPLoadMultiBlock(POLY_OPA_DISP++, nintendo_rogo_static_Tex_001800, 0x100, 1, G_IM_FMT_I, G_IM_SIZ_8b, 32, 32, 0,
                       G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, 5, 5, 2, 11);
 
     for (idx = 0, y = 94; idx < 16; idx++, y += 2) {
-        gDPLoadTextureBlock(POLY_OPA_DISP++, &D_01000000[0x180 * idx], G_IM_FMT_I, G_IM_SIZ_8b, 192, 2, 0,
-                            G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD,
-                            G_TX_NOLOD);
+        gDPLoadTextureBlock(POLY_OPA_DISP++, &((u8*)nintendo_rogo_static_Tex_000000)[0x180 * idx], G_IM_FMT_I,
+                            G_IM_SIZ_8b, 192, 2, 0, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK,
+                            G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
 
         gDPSetTileSize(POLY_OPA_DISP++, 1, this->uls, (this->ult & 0x7F) - idx * 4, 0, 0);
-        gSPTextureRectangle(POLY_OPA_DISP++, 388, y << 2, 1156, (y + 2) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10, 1 << 10);
+        gSPTextureRectangle(POLY_OPA_DISP++, 97 << 2, y << 2, 289 << 2, (y + 2) << 2, G_TX_RENDERTILE, 0, 0, 1 << 10,
+                            1 << 10);
     }
 
-    func_8007672C(this->state.gfxCtx, 0, 0, 0, (s16)this->coverAlpha, 2);
+    Environment_FillScreen(this->state.gfxCtx, 0, 0, 0, (s16)this->coverAlpha, FILL_SCREEN_XLU);
 
     sTitleRotY += 300;
 
@@ -130,7 +128,7 @@ void Title_Main(GameState* thisx) {
     Title_Calc(this);
     Title_Draw(this);
 
-    if (D_8012DBC0) {
+    if (gIsCtrlr2Valid) {
         Gfx* gfx = POLY_OPA_DISP;
         s32 pad;
 
@@ -139,8 +137,8 @@ void Title_Main(GameState* thisx) {
     }
 
     if (this->exit) {
-        gSaveContext.seqIndex = 0xFF;
-        gSaveContext.nightSeqIndex = 0xFF;
+        gSaveContext.seqId = (u8)NA_BGM_DISABLED;
+        gSaveContext.natureAmbienceId = 0xFF;
         gSaveContext.gameMode = 1;
         this->state.running = false;
         SET_NEXT_GAMESTATE(&this->state, Opening_Init, OpeningContext);

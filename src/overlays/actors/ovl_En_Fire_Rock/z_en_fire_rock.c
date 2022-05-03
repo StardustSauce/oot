@@ -1,10 +1,9 @@
 #include "z_en_fire_rock.h"
 #include "overlays/actors/ovl_En_Encount2/z_en_encount2.h"
 #include "vt.h"
+#include "objects/object_efc_star_field/object_efc_star_field.h"
 
-#define FLAGS 0x00000030
-
-#define THIS ((EnFireRock*)thisx)
+#define FLAGS (ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
 void EnFireRock_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnFireRock_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -15,8 +14,6 @@ void FireRock_WaitSpawnRocksFromCeiling(EnFireRock* this, GlobalContext* globalC
 void FireRock_WaitOnFloor(EnFireRock* this, GlobalContext* globalCtx);
 void EnFireRock_Fall(EnFireRock* this, GlobalContext* globalCtx);
 void EnFireRock_SpawnMoreBrokenPieces(EnFireRock* this, GlobalContext* globalCtx);
-
-extern Gfx D_06000DE0[];
 
 const ActorInit En_Fire_Rock_InitVars = {
     ACTOR_EN_FIRE_ROCK,
@@ -72,8 +69,8 @@ static ColliderCylinderInit D_80A12CCC = {
 
 void EnFireRock_Init(Actor* thisx, GlobalContext* globalCtx) {
     GlobalContext* globalCtx2 = globalCtx;
-    Player* player = PLAYER;
-    EnFireRock* this = THIS;
+    Player* player = GET_PLAYER(globalCtx);
+    EnFireRock* this = (EnFireRock*)thisx;
     s16 temp;
 
     this->type = this->actor.params;
@@ -107,8 +104,8 @@ void EnFireRock_Init(Actor* thisx, GlobalContext* globalCtx) {
             break;
         case FIRE_ROCK_SPAWNED_FALLING1: // spawned by encount2
             // sets unused vars?
-            this->unk17C.x = (f32)(Rand_CenteredFloat(50.0f) + player->actor.world.pos.x);
-            this->unk17C.z = (f32)(Rand_CenteredFloat(50.0f) + player->actor.world.pos.z);
+            this->unk_17C.x = (f32)(Rand_CenteredFloat(50.0f) + player->actor.world.pos.x);
+            this->unk_17C.z = (f32)(Rand_CenteredFloat(50.0f) + player->actor.world.pos.z);
         case FIRE_ROCK_SPAWNED_FALLING2: // spawned by encount2 and by the ceilling spawner
             this->scale = (Rand_ZeroFloat(2.0f) / 100.0f) + 0.02f;
             Actor_SetScale(&this->actor, this->scale);
@@ -149,7 +146,7 @@ void EnFireRock_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnFireRock_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnFireRock* this = THIS;
+    EnFireRock* this = (EnFireRock*)thisx;
 
     if ((this->actor.parent != NULL) && (this->actor.parent == &this->spawner->actor)) {
         EnEncount2* spawner = (EnEncount2*)this->actor.parent;
@@ -169,7 +166,7 @@ void EnFireRock_Fall(EnFireRock* this, GlobalContext* globalCtx) {
     Vec3f flamePos;
     s32 i;
 
-    player = PLAYER;
+    player = GET_PLAYER(globalCtx);
     if ((this->actor.floorHeight == -10000.0f) || (this->actor.world.pos.y < (player->actor.world.pos.y - 200.0f))) {
         Actor_Kill(&this->actor);
         return;
@@ -195,14 +192,14 @@ void EnFireRock_Fall(EnFireRock* this, GlobalContext* globalCtx) {
             }
             break;
     }
-    if ((this->actor.bgCheckFlags & 1) && (this->timer == 0)) {
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && (this->timer == 0)) {
         switch (this->type) {
             case FIRE_ROCK_SPAWNED_FALLING1:
             case FIRE_ROCK_SPAWNED_FALLING2:
                 func_80033E88(&this->actor, globalCtx, 5, 2);
             case FIRE_ROCK_BROKEN_PIECE1:
                 Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->actor.world.pos, this->actor.shape.shadowScale,
-                                         1, 8.0f, 500, 10, 0);
+                                         1, 8.0f, 500, 10, false);
                 for (i = 0; i < 5; i++) {
                     flamePos.x = Rand_CenteredFloat(20.0f) + this->actor.world.pos.x;
                     flamePos.y = this->actor.floorHeight;
@@ -213,8 +210,8 @@ void EnFireRock_Fall(EnFireRock* this, GlobalContext* globalCtx) {
                 break;
             default:
                 Actor_SpawnFloorDustRing(globalCtx, &this->actor, &this->actor.world.pos, this->actor.shape.shadowScale,
-                                         3, 8.0f, 200, 10, 0);
-                Audio_PlaySoundAtPosition(globalCtx, &this->actor.world.pos, 40, NA_SE_EV_EXPLOSION);
+                                         3, 8.0f, 200, 10, false);
+                SoundSource_PlaySfxAtFixedWorldPos(globalCtx, &this->actor.world.pos, 40, NA_SE_EV_EXPLOSION);
                 Actor_Kill(&this->actor);
                 break;
         }
@@ -304,10 +301,10 @@ void FireRock_WaitOnFloor(EnFireRock* this, GlobalContext* globalCtx) {
 }
 
 void EnFireRock_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnFireRock* this = THIS;
+    EnFireRock* this = (EnFireRock*)thisx;
     s16 setCollision;
-    Player* player = PLAYER;
-    Actor* playerActor = &PLAYER->actor;
+    Player* player = GET_PLAYER(globalCtx);
+    Actor* playerActor = &GET_PLAYER(globalCtx)->actor;
 
     if (this->timer2 != 0) {
         this->timer2--;
@@ -319,6 +316,7 @@ void EnFireRock_Update(Actor* thisx, GlobalContext* globalCtx) {
 
     if (this->type != FIRE_ROCK_CEILING_SPOT_SPAWNER) {
         f32 temp;
+
         this->rockRotation.x += this->angularVelocity.x;
         this->rockRotation.y += this->angularVelocity.y;
         this->rockRotation.z += this->angularVelocity.z;
@@ -338,7 +336,8 @@ void EnFireRock_Update(Actor* thisx, GlobalContext* globalCtx) {
         }
         if (this->type != FIRE_ROCK_ON_FLOOR) {
             Actor_MoveForward(thisx);
-            Actor_UpdateBgCheckInfo(globalCtx, thisx, 50.0f, 50.0f, 100.0f, 0x1C);
+            Actor_UpdateBgCheckInfo(globalCtx, thisx, 50.0f, 50.0f, 100.0f,
+                                    UPDBGCHECKINFO_FLAG_2 | UPDBGCHECKINFO_FLAG_3 | UPDBGCHECKINFO_FLAG_4);
         }
 
         setCollision = false;
@@ -363,7 +362,7 @@ void EnFireRock_Update(Actor* thisx, GlobalContext* globalCtx) {
             if (this->collider.base.atFlags & 2) {
                 this->collider.base.atFlags &= ~2;
                 if (this->collider.base.at == playerActor) {
-                    if (!(player->stateFlags1 & 0x04000000)) {
+                    if (!(player->stateFlags1 & PLAYER_STATE1_26)) {
                         func_8002F758(globalCtx, thisx, 2.0f, -player->actor.world.rot.y, 3.0f, 4);
                     }
                     return;
@@ -380,7 +379,7 @@ void EnFireRock_Update(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnFireRock_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnFireRock* this = THIS;
+    EnFireRock* this = (EnFireRock*)thisx;
     s32 pad;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_fire_rock.c", 747);
@@ -395,6 +394,6 @@ void EnFireRock_Draw(Actor* thisx, GlobalContext* globalCtx) {
     gDPSetEnvColor(POLY_OPA_DISP++, 155, 255, 55, 255);
     gSPMatrix(POLY_OPA_DISP++, Matrix_NewMtx(globalCtx->state.gfxCtx, "../z_en_fire_rock.c", 768),
               G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
-    gSPDisplayList(POLY_OPA_DISP++, D_06000DE0);
+    gSPDisplayList(POLY_OPA_DISP++, object_efc_star_field_DL_000DE0);
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_en_fire_rock.c", 773);
 }

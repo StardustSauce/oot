@@ -1,9 +1,7 @@
 #include "z_en_bigokuta.h"
 #include "objects/object_bigokuta/object_bigokuta.h"
 
-#define FLAGS 0x00000035
-
-#define THIS ((EnBigokuta*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
 void EnBigokuta_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnBigokuta_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -149,7 +147,7 @@ static InitChainEntry sInitChain[] = {
     ICHAIN_F32(targetArrowOffset, 2000, ICHAIN_CONTINUE),
     ICHAIN_U8(targetMode, 2, ICHAIN_CONTINUE),
     ICHAIN_F32(gravity, -1, ICHAIN_CONTINUE),
-    ICHAIN_S8(naviEnemyId, 0x59, ICHAIN_CONTINUE),
+    ICHAIN_S8(naviEnemyId, NAVI_ENEMY_BIGOCTO, ICHAIN_CONTINUE),
     ICHAIN_VEC3F_DIV1000(scale, 33, ICHAIN_STOP),
 };
 
@@ -157,7 +155,7 @@ static InitChainEntry sInitChain[] = {
 static s32 sUnused[] = { 0xFFFFFFFF, 0x969696FF };
 
 void EnBigokuta_Init(Actor* thisx, GlobalContext* globalCtx) {
-    EnBigokuta* this = THIS;
+    EnBigokuta* this = (EnBigokuta*)thisx;
     s32 i;
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
@@ -190,7 +188,7 @@ void EnBigokuta_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnBigokuta_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnBigokuta* this = THIS;
+    EnBigokuta* this = (EnBigokuta*)thisx;
     s32 i;
 
     Collider_DestroyJntSph(globalCtx, &this->collider);
@@ -385,14 +383,14 @@ void func_809BD6B8(EnBigokuta* this) {
 void func_809BD768(EnBigokuta* this) {
     this->unk_194 = Rand_ZeroOne() < 0.5f ? -1 : 1;
     this->unk_19A = 0;
-    this->actor.flags &= ~1;
+    this->actor.flags &= ~ACTOR_FLAG_0;
     this->cylinder[0].base.atFlags &= ~AT_ON;
     Audio_PlayActorSound2(&this->actor, NA_SE_EN_DAIOCTA_SINK);
     this->actionFunc = func_809BE4A4;
 }
 
 void func_809BD7F0(EnBigokuta* this, GlobalContext* globalCtx) {
-    this->actor.world.rot.y = Actor_WorldYawTowardPoint(globalCtx->actorCtx.actorLists[2].head, &this->actor.home.pos);
+    this->actor.world.rot.y = Actor_WorldYawTowardPoint(&GET_PLAYER(globalCtx)->actor, &this->actor.home.pos);
     this->actor.shape.rot.y = this->actor.world.rot.y + (this->unk_194 * 0x4000);
     func_809BCE3C(this);
     this->actionFunc = func_809BE518;
@@ -407,7 +405,7 @@ void func_809BD84C(EnBigokuta* this, GlobalContext* globalCtx) {
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_DAIOCTA_VOICE);
     }
     if (this->unk_196 == 1) {
-        func_800F5ACC(0x38);
+        func_800F5ACC(NA_BGM_MINI_BOSS);
     }
     if (this->actor.params == 1) {
         func_809BD370(this);
@@ -470,14 +468,14 @@ void func_809BDB90(EnBigokuta* this, GlobalContext* globalCtx) {
     }
     if (this->unk_196 == 0) {
         if (this->actor.params == 3) {
-            func_800F5ACC(0x38);
+            func_800F5ACC(NA_BGM_MINI_BOSS);
         }
         func_809BD3F8(this);
     }
 }
 
 void func_809BDC08(EnBigokuta* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 phi_v0;
     s16 pad;
     s16 phi_v1;
@@ -573,7 +571,7 @@ void func_809BDFC8(EnBigokuta* this, GlobalContext* globalCtx) {
 }
 
 void func_809BE058(EnBigokuta* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     f32 speedXZ;
 
     if (this->unk_196 != 0) {
@@ -644,7 +642,7 @@ void func_809BE26C(EnBigokuta* this, GlobalContext* globalCtx) {
             Flags_SetClear(globalCtx, this->actor.room);
             Camera_ChangeSetting(globalCtx->cameraPtrs[MAIN_CAM], CAM_SET_DUNGEON0);
             func_8005ACFC(globalCtx->cameraPtrs[MAIN_CAM], 4);
-            Audio_PlaySoundAtPosition(globalCtx, &this->actor.world.pos, 50, NA_SE_EN_OCTAROCK_BUBLE);
+            SoundSource_PlaySfxAtFixedWorldPos(globalCtx, &this->actor.world.pos, 50, NA_SE_EN_OCTAROCK_BUBLE);
             Item_DropCollectibleRandom(globalCtx, &this->actor, &this->actor.world.pos, 0xB0);
             Actor_Kill(&this->actor);
         }
@@ -686,7 +684,7 @@ void func_809BE4A4(EnBigokuta* this, GlobalContext* globalCtx) {
 
 void func_809BE518(EnBigokuta* this, GlobalContext* globalCtx) {
     if (Math_StepToF(&this->actor.world.pos.y, this->actor.home.pos.y, 10.0f)) {
-        this->actor.flags |= 1;
+        this->actor.flags |= ACTOR_FLAG_0;
         func_809BD3F8(this);
     }
 }
@@ -770,7 +768,7 @@ void EnBigokuta_UpdateDamage(EnBigokuta* this, GlobalContext* globalCtx) {
 }
 
 void EnBigokuta_Update(Actor* thisx, GlobalContext* globalCtx2) {
-    EnBigokuta* this = THIS;
+    EnBigokuta* this = (EnBigokuta*)thisx;
     s32 i;
     GlobalContext* globalCtx = globalCtx2;
 
@@ -779,7 +777,7 @@ void EnBigokuta_Update(Actor* thisx, GlobalContext* globalCtx2) {
     this->actionFunc(this, globalCtx);
     func_809BD2E4(this);
     func_809BE568(this);
-    Camera_ChangeSetting(globalCtx->cameraPtrs[MAIN_CAM], CAM_SET_TAKO);
+    Camera_ChangeSetting(globalCtx->cameraPtrs[MAIN_CAM], CAM_SET_BIG_OCTO);
     func_8005AD1C(globalCtx->cameraPtrs[MAIN_CAM], 4);
 
     if (this->cylinder[0].base.atFlags & AT_ON) {
@@ -787,7 +785,7 @@ void EnBigokuta_Update(Actor* thisx, GlobalContext* globalCtx2) {
             for (i = 0; i < ARRAY_COUNT(this->cylinder); i++) {
                 CollisionCheck_SetAT(globalCtx, &globalCtx->colChkCtx, &this->cylinder[i].base);
             }
-            this->actor.flags |= 0x1000000;
+            this->actor.flags |= ACTOR_FLAG_24;
         } else {
             for (i = 0; i < ARRAY_COUNT(this->cylinder); i++) {
                 CollisionCheck_SetOC(globalCtx, &globalCtx->colChkCtx, &this->cylinder[i].base);
@@ -811,7 +809,7 @@ void EnBigokuta_Update(Actor* thisx, GlobalContext* globalCtx2) {
 
 s32 EnBigokuta_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                                 void* thisx) {
-    EnBigokuta* this = THIS;
+    EnBigokuta* this = (EnBigokuta*)thisx;
     u8 intensity;
     f32 temp_f0;
     s32 temp_hi;
@@ -868,7 +866,7 @@ s32 EnBigokuta_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** d
 }
 
 void EnBigokuta_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnBigokuta* this = THIS;
+    EnBigokuta* this = (EnBigokuta*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_bigokuta.c", 2017);
 
@@ -894,7 +892,7 @@ void EnBigokuta_Draw(Actor* thisx, GlobalContext* globalCtx) {
     } else {
         func_80093D84(globalCtx->state.gfxCtx);
         gSPSegment(POLY_XLU_DISP++, 0x0C, D_80116280);
-        gDPSetEnvColor(POLY_XLU_DISP++, 0, 0, 0, (this->actor.scale.y * 7727.273f));
+        gDPSetEnvColor(POLY_XLU_DISP++, 0, 0, 0, (this->actor.scale.y * (255 / 0.033f)));
         POLY_XLU_DISP = SkelAnime_DrawFlex(globalCtx, this->skelAnime.skeleton, this->skelAnime.jointTable,
                                            this->skelAnime.dListCount, NULL, NULL, NULL, POLY_XLU_DISP);
     }

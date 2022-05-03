@@ -8,9 +8,7 @@
 #include "objects/object_heavy_object/object_heavy_object.h"
 #include "vt.h"
 
-#define FLAGS 0x00000000
-
-#define THIS ((BgHeavyBlock*)thisx)
+#define FLAGS 0
 
 #define PIECE_FLAG_HIT_FLOOR (1 << 0)
 
@@ -77,14 +75,14 @@ void BgHeavyBlock_InitPiece(BgHeavyBlock* this, f32 scale) {
 void BgHeavyBlock_SetupDynapoly(BgHeavyBlock* this, GlobalContext* globalCtx) {
     s32 pad[2];
     CollisionHeader* colHeader = NULL;
-    this->dyna.actor.flags |= 0x20030;
+    this->dyna.actor.flags |= ACTOR_FLAG_4 | ACTOR_FLAG_5 | ACTOR_FLAG_17;
     DynaPolyActor_Init(&this->dyna, DPM_UNK);
     CollisionHeader_GetVirtual(&gHeavyBlockCol, &colHeader);
     this->dyna.bgId = DynaPoly_SetBgActor(globalCtx, &globalCtx->colCtx.dyna, &this->dyna.actor, colHeader);
 }
 
 void BgHeavyBlock_Init(Actor* thisx, GlobalContext* globalCtx) {
-    BgHeavyBlock* this = THIS;
+    BgHeavyBlock* this = (BgHeavyBlock*)thisx;
 
     Actor_ProcessInitChain(thisx, sInitChain);
     ActorShape_Init(&thisx->shape, 0.0f, NULL, 0.0f);
@@ -101,7 +99,7 @@ void BgHeavyBlock_Init(Actor* thisx, GlobalContext* globalCtx) {
             this->actionFunc = BgHeavyBlock_MovePiece;
             BgHeavyBlock_InitPiece(this, 1.0f);
             this->timer = 120;
-            thisx->flags |= 0x10;
+            thisx->flags |= ACTOR_FLAG_4;
             this->unk_164.y = -50.0f;
             break;
         case HEAVYBLOCK_SMALL_PIECE:
@@ -109,7 +107,7 @@ void BgHeavyBlock_Init(Actor* thisx, GlobalContext* globalCtx) {
             this->actionFunc = BgHeavyBlock_MovePiece;
             BgHeavyBlock_InitPiece(this, 2.0f);
             this->timer = 120;
-            thisx->flags |= 0x10;
+            thisx->flags |= ACTOR_FLAG_4;
             this->unk_164.y = -20.0f;
             break;
         case HEAVYBLOCK_BREAKABLE:
@@ -151,7 +149,7 @@ void BgHeavyBlock_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void BgHeavyBlock_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    BgHeavyBlock* this = THIS;
+    BgHeavyBlock* this = (BgHeavyBlock*)thisx;
     switch (this->dyna.actor.params & 0xFF) {
         case HEAVYBLOCK_BIG_PIECE:
             break;
@@ -181,10 +179,10 @@ void BgHeavyBlock_MovePiece(BgHeavyBlock* this, GlobalContext* globalCtx) {
     if (!(this->pieceFlags & PIECE_FLAG_HIT_FLOOR)) {
         thisx->world.pos.y += this->unk_164.y;
         thisx->prevPos.y += this->unk_164.y;
-        Actor_UpdateBgCheckInfo(globalCtx, thisx, 50.0f, 50.0f, 0.0f, 5);
+        Actor_UpdateBgCheckInfo(globalCtx, thisx, 50.0f, 50.0f, 0.0f, UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2);
         thisx->world.pos.y -= this->unk_164.y;
         thisx->prevPos.y -= this->unk_164.y;
-        if (thisx->bgCheckFlags & 1) {
+        if (thisx->bgCheckFlags & BGCHECKFLAG_GROUND) {
             this->pieceFlags |= PIECE_FLAG_HIT_FLOOR;
             thisx->velocity.y = Rand_ZeroFloat(4.0f) + 2.0f;
             thisx->velocity.x = Rand_CenteredFloat(8.0f);
@@ -239,8 +237,8 @@ void BgHeavyBlock_SpawnDust(GlobalContext* globalCtx, f32 posX, f32 posY, f32 po
     accel.x = 0.0f;
     accel.y = (dustParams & 8) ? 0.0f : 0.5f;
 
-    eye = ACTIVE_CAM->eye;
-    at = ACTIVE_CAM->at;
+    eye = GET_ACTIVE_CAM(globalCtx)->eye;
+    at = GET_ACTIVE_CAM(globalCtx)->at;
 
     scale = 1000;
     scaleStep = 160;
@@ -333,7 +331,7 @@ void BgHeavyBlock_Wait(BgHeavyBlock* this, GlobalContext* globalCtx) {
                 break;
         }
 
-        quakeIndex = Quake_Add(ACTIVE_CAM, 3);
+        quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
         Quake_SetSpeed(quakeIndex, 25000);
         Quake_SetQuakeValues(quakeIndex, 1, 1, 5, 0);
         Quake_SetCountdown(quakeIndex, 10);
@@ -342,7 +340,7 @@ void BgHeavyBlock_Wait(BgHeavyBlock* this, GlobalContext* globalCtx) {
 }
 
 void BgHeavyBlock_LiftedUp(BgHeavyBlock* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s32 pad;
     f32 cosYaw;
     f32 zOffset;
@@ -400,22 +398,23 @@ void BgHeavyBlock_Fly(BgHeavyBlock* this, GlobalContext* globalCtx) {
                 Flags_SetSwitch(globalCtx, (this->dyna.actor.params >> 8) & 0x3F);
                 Actor_Kill(&this->dyna.actor);
 
-                quakeIndex = Quake_Add(ACTIVE_CAM, 3);
+                quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
                 Quake_SetSpeed(quakeIndex, 28000);
                 Quake_SetQuakeValues(quakeIndex, 14, 2, 100, 0);
                 Quake_SetCountdown(quakeIndex, 30);
 
-                quakeIndex = Quake_Add(ACTIVE_CAM, 2);
+                quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 2);
                 Quake_SetSpeed(quakeIndex, 12000);
                 Quake_SetQuakeValues(quakeIndex, 5, 0, 0, 0);
                 Quake_SetCountdown(quakeIndex, 999);
 
-                Audio_PlaySoundAtPosition(globalCtx, &this->dyna.actor.world.pos, 30, NA_SE_EV_ELECTRIC_EXPLOSION);
+                SoundSource_PlaySfxAtFixedWorldPos(globalCtx, &this->dyna.actor.world.pos, 30,
+                                                   NA_SE_EV_ELECTRIC_EXPLOSION);
                 return;
             case HEAVYBLOCK_UNBREAKABLE_OUTSIDE_CASTLE:
                 Audio_PlayActorSound2(&this->dyna.actor, NA_SE_EV_STONE_BOUND);
 
-                quakeIndex = Quake_Add(ACTIVE_CAM, 3);
+                quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
                 Quake_SetSpeed(quakeIndex, 28000);
                 Quake_SetQuakeValues(quakeIndex, 16, 2, 120, 0);
                 Quake_SetCountdown(quakeIndex, 40);
@@ -426,7 +425,7 @@ void BgHeavyBlock_Fly(BgHeavyBlock* this, GlobalContext* globalCtx) {
             case HEAVYBLOCK_UNBREAKABLE:
                 Audio_PlayActorSound2(&this->dyna.actor, NA_SE_EV_BUYOSTAND_STOP_U);
 
-                quakeIndex = Quake_Add(ACTIVE_CAM, 3);
+                quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
                 Quake_SetSpeed(quakeIndex, 28000);
                 Quake_SetQuakeValues(quakeIndex, 14, 2, 100, 0);
                 Quake_SetCountdown(quakeIndex, 40);
@@ -434,7 +433,7 @@ void BgHeavyBlock_Fly(BgHeavyBlock* this, GlobalContext* globalCtx) {
                 this->actionFunc = BgHeavyBlock_Land;
                 break;
             default:
-                quakeIndex = Quake_Add(ACTIVE_CAM, 3);
+                quakeIndex = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
                 Quake_SetSpeed(quakeIndex, 28000);
                 Quake_SetQuakeValues(quakeIndex, 14, 2, 100, 0);
                 Quake_SetCountdown(quakeIndex, 40);
@@ -471,13 +470,13 @@ void BgHeavyBlock_Land(BgHeavyBlock* this, GlobalContext* globalCtx) {
                 break;
         }
     } else {
-        this->dyna.actor.flags &= ~0x30;
+        this->dyna.actor.flags &= ~(ACTOR_FLAG_4 | ACTOR_FLAG_5);
         this->actionFunc = BgHeavyBlock_DoNothing;
     }
 }
 
 void BgHeavyBlock_Update(Actor* thisx, GlobalContext* globalCtx) {
-    BgHeavyBlock* this = THIS;
+    BgHeavyBlock* this = (BgHeavyBlock*)thisx;
 
     this->actionFunc(this, globalCtx);
 }
@@ -485,17 +484,18 @@ void BgHeavyBlock_Update(Actor* thisx, GlobalContext* globalCtx) {
 void BgHeavyBlock_Draw(Actor* thisx, GlobalContext* globalCtx) {
     static Vec3f D_80884EC8 = { 0.0f, 0.0f, 0.0f };
     static Vec3f D_80884ED4 = { 0.0f, 400.0f, 0.0f };
-    BgHeavyBlock* this = THIS;
+    BgHeavyBlock* this = (BgHeavyBlock*)thisx;
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_bg_heavy_block.c", 904);
 
     if (BgHeavyBlock_LiftedUp == this->actionFunc) {
-        func_800D1694(player->leftHandPos.x, player->leftHandPos.y, player->leftHandPos.z, &thisx->shape.rot);
+        Matrix_SetTranslateRotateYXZ(player->leftHandPos.x, player->leftHandPos.y, player->leftHandPos.z,
+                                     &thisx->shape.rot);
         Matrix_Translate(-this->unk_164.x, -this->unk_164.y, -this->unk_164.z, MTXMODE_APPLY);
     } else if ((thisx->gravity == 0.0f) && (BgHeavyBlock_Land == this->actionFunc)) {
-        func_800D1694(thisx->home.pos.x, thisx->home.pos.y, thisx->home.pos.z, &thisx->shape.rot);
+        Matrix_SetTranslateRotateYXZ(thisx->home.pos.x, thisx->home.pos.y, thisx->home.pos.z, &thisx->shape.rot);
         Matrix_Translate(-D_80884ED4.x, -D_80884ED4.y, -D_80884ED4.z, MTXMODE_APPLY);
     }
 

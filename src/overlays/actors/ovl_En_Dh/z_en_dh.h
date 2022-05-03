@@ -1,5 +1,5 @@
-#ifndef _Z_EN_DH_H_
-#define _Z_EN_DH_H_
+#ifndef Z_EN_DH_H
+#define Z_EN_DH_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -13,8 +13,8 @@ typedef struct EnDh {
     /* 0x014C */ SkelAnime skelAnime;
     /* 0x0170 */ Vec3s jointTable[16];
     /* 0x01F0 */ Vec3s limbRotTable[16];
-    /* 0x0250 */ u8 actionState; 
-    /* 0x0251 */ u8 retreat; 
+    /* 0x0250 */ u8 actionState;
+    /* 0x0251 */ u8 retreat;
     /* 0x0252 */ u8 drawDirtWave;
     /* 0x0254 */ EnDhActionFunc actionFunc;
     /* 0x0258 */ u8 unk_258; // Related to player->unk_845
@@ -31,8 +31,6 @@ typedef struct EnDh {
     /* 0x031C */ f32 dirtWaveHeight;
     /* 0x0320 */ f32 dirtWaveAlpha;
 } EnDh; // size = 0x0324
-
-extern const ActorInit En_Dh_InitVars;
 
 typedef enum {
     ENDH_HANDS_KILLED_4 = -4,

@@ -1,5 +1,5 @@
-#ifndef _Z_DEMO_GJ_H_
-#define _Z_DEMO_GJ_H_
+#ifndef Z_DEMO_GJ_H
+#define Z_DEMO_GJ_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -22,8 +22,6 @@ typedef struct DemoGj {
     /* 0x026C */ Vec3f unk_26C; // This actor never sets this. Specifies which direction will this actor explode when killed using `killFlag`.
 } DemoGj; // size = 0x0278
 
-extern const ActorInit Demo_Gj_InitVars;
-
 /**
  * The format of this actor's params is the following:
  * bits 11-15: The collectible that will be dropped when killed.
@@ -41,7 +39,7 @@ typedef enum {
     /* 14 */ DEMOGJ_TYPE_RUBBLE_PILE_7,
     /* 16 */ DEMOGJ_TYPE_DESTRUCTABLE_RUBBLE_1 = 16,   // This three rubbles are the ones that Ganon can destroy and drop collectables.
     /* 17 */ DEMOGJ_TYPE_DESTRUCTABLE_RUBBLE_2,        // They are spawned as soon as the others, but they have collision and are rendered only when Ganondorf has transformed into Ganon.
-    /* 22 */ DEMOGJ_TYPE_DESTRUCTABLE_RUBBLE_TALL = 22 //
+    /* 22 */ DEMOGJ_TYPE_DESTRUCTABLE_RUBBLE_TALL = 22
 } DemoGjType;
 
 #endif

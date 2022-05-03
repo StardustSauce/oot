@@ -7,9 +7,7 @@
 #include "z_en_ani.h"
 #include "objects/object_ani/object_ani.h"
 
-#define FLAGS 0x00000009
-
-#define THIS ((EnAni*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_3)
 
 void EnAni_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnAni_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -71,7 +69,7 @@ static InitChainEntry sInitChain[] = {
 
 void EnAni_Init(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnAni* this = THIS;
+    EnAni* this = (EnAni*)thisx;
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     ActorShape_Init(&this->actor.shape, -2800.0f, ActorShadow_DrawCircle, 36.0f);
@@ -81,7 +79,7 @@ void EnAni_Init(Actor* thisx, GlobalContext* globalCtx) {
     Collider_InitCylinder(globalCtx, &this->collider);
     Collider_SetCylinder(globalCtx, &this->collider, &this->actor, &sCylinderInit);
     this->actor.colChkInfo.mass = MASS_IMMOVABLE;
-    if (LINK_IS_CHILD) {
+    if (!LINK_IS_ADULT) {
         EnAni_SetupAction(this, func_809B064C);
     } else {
         EnAni_SetupAction(this, func_809B07F8);
@@ -93,7 +91,7 @@ void EnAni_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnAni_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnAni* this = THIS;
+    EnAni* this = (EnAni*)thisx;
 
     Collider_DestroyCylinder(globalCtx, &this->collider);
 }
@@ -106,13 +104,13 @@ s32 EnAni_SetText(EnAni* this, GlobalContext* globalCtx, u16 textId) {
 }
 
 void func_809B04F0(EnAni* this, GlobalContext* globalCtx) {
-    if (func_8002F334(&this->actor, globalCtx)) {
+    if (Actor_TextboxIsClosing(&this->actor, globalCtx)) {
         EnAni_SetupAction(this, func_809B064C);
     }
 }
 
 void func_809B0524(EnAni* this, GlobalContext* globalCtx) {
-    if (func_8002F334(&this->actor, globalCtx)) {
+    if (Actor_TextboxIsClosing(&this->actor, globalCtx)) {
         EnAni_SetupAction(this, func_809B07F8);
     }
 }
@@ -120,19 +118,19 @@ void func_809B0524(EnAni* this, GlobalContext* globalCtx) {
 void func_809B0558(EnAni* this, GlobalContext* globalCtx) {
     if (Actor_HasParent(&this->actor, globalCtx)) {
         this->actor.parent = NULL;
-        if (LINK_IS_CHILD) {
+        if (!LINK_IS_ADULT) {
             EnAni_SetupAction(this, func_809B04F0);
         } else {
             EnAni_SetupAction(this, func_809B0524);
         }
-        gSaveContext.itemGetInf[1] |= 0x20;
-        return;
+        SET_ITEMGETINF(ITEMGETINF_15);
+    } else {
+        func_8002F434(&this->actor, globalCtx, GI_HEART_PIECE, 10000.0f, 200.0f);
     }
-    func_8002F434(&this->actor, globalCtx, GI_HEART_PIECE, 10000.0f, 200.0f);
 }
 
 void func_809B05F0(EnAni* this, GlobalContext* globalCtx) {
-    if (func_8002F334(&this->actor, globalCtx)) {
+    if (Actor_TextboxIsClosing(&this->actor, globalCtx)) {
         EnAni_SetupAction(this, func_809B0558);
     }
     func_8002F434(&this->actor, globalCtx, GI_HEART_PIECE, 10000.0f, 200.0f);
@@ -144,30 +142,29 @@ void func_809B064C(EnAni* this, GlobalContext* globalCtx) {
     u16 textId2;
 
     textId2 = Text_GetFaceReaction(globalCtx, 0xA);
-    textId = textId2 & 0xffff;
+    textId = textId2 & 0xFFFF;
 
     if (!textId) {}
 
     if (textId2 == 0) {
-        textId = gSaveContext.nightFlag ? 0x5051 : 0x5050; // "...all I can do is look at the stars."
-                                                           // "...all I can do is look at Death Mountain."
+        textId = !IS_DAY ? 0x5051 : 0x5050;
     }
 
     yawDiff = this->actor.yawTowardsPlayer - this->actor.shape.rot.y;
-    if (func_8002F194(&this->actor, globalCtx)) {
-        if (this->actor.textId == 0x5056) { // "To get a good view..."
+    if (Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
+        if (this->actor.textId == 0x5056) {
             EnAni_SetupAction(this, func_809B04F0);
-        } else if (this->actor.textId == 0x5055) { // "...I'll give you this as a memento."
+        } else if (this->actor.textId == 0x5055) {
             EnAni_SetupAction(this, func_809B05F0);
         } else {
             EnAni_SetupAction(this, func_809B04F0);
         }
     } else if (yawDiff >= -0x36AF && yawDiff < 0 && this->actor.xzDistToPlayer < 150.0f &&
                -80.0f < this->actor.yDistToPlayer) {
-        if (gSaveContext.itemGetInf[1] & 0x20) {
-            EnAni_SetText(this, globalCtx, 0x5056); // "To get a good view..."
+        if (GET_ITEMGETINF(ITEMGETINF_15)) {
+            EnAni_SetText(this, globalCtx, 0x5056);
         } else {
-            EnAni_SetText(this, globalCtx, 0x5055); // "...I'll give you this as a memento."
+            EnAni_SetText(this, globalCtx, 0x5055);
         }
     } else if (yawDiff >= -0x3E7 && yawDiff < 0x36B0 && this->actor.xzDistToPlayer < 350.0f) {
         EnAni_SetText(this, globalCtx, textId);
@@ -180,27 +177,26 @@ void func_809B07F8(EnAni* this, GlobalContext* globalCtx) {
     u16 textId;
 
     yawDiff = this->actor.yawTowardsPlayer - this->actor.shape.rot.y;
-    if (func_8002F194(&this->actor, globalCtx)) {
-        if (this->actor.textId == 0x5056) { // "To get a good view..."
+    if (Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
+        if (this->actor.textId == 0x5056) {
             EnAni_SetupAction(this, func_809B0524);
-        } else if (this->actor.textId == 0x5055) { // "...I'll give you this as a memento."
+        } else if (this->actor.textId == 0x5055) {
             EnAni_SetupAction(this, func_809B05F0);
         } else {
             EnAni_SetupAction(this, func_809B0524);
         }
     } else if (yawDiff > -0x36B0 && yawDiff < 0 && this->actor.xzDistToPlayer < 150.0f &&
                -80.0f < this->actor.yDistToPlayer) {
-        if (gSaveContext.itemGetInf[1] & 0x20) {
-            EnAni_SetText(this, globalCtx, 0x5056); // "To get a good view..."
+        if (GET_ITEMGETINF(ITEMGETINF_15)) {
+            EnAni_SetText(this, globalCtx, 0x5056);
         } else {
-            EnAni_SetText(this, globalCtx, 0x5055); // "...I'll give you this as a memento."
+            EnAni_SetText(this, globalCtx, 0x5055);
         }
     } else if (yawDiff > -0x3E8 && yawDiff < 0x36B0 && this->actor.xzDistToPlayer < 350.0f) {
-        if (!(gSaveContext.eventChkInf[2] & 0x8000)) {
-            textId = 0x5052; // "...Something is happening on Death Mountain!"
+        if (!GET_EVENTCHKINF(EVENTCHKINF_2F)) {
+            textId = 0x5052;
         } else {
-            textId = (gSaveContext.itemGetInf[1] & 0x20) ? 0x5054 : 0x5053; // "I don't feel like getting down..."
-                                                                            // "...Death Mountain is back to normal!"
+            textId = GET_ITEMGETINF(ITEMGETINF_15) ? 0x5054 : 0x5053;
         }
         EnAni_SetText(this, globalCtx, textId);
     }
@@ -237,13 +233,13 @@ void func_809B0A6C(EnAni* this, GlobalContext* globalCtx) {
 }
 
 void EnAni_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnAni* this = THIS;
+    EnAni* this = (EnAni*)thisx;
     s32 pad[2];
 
     Collider_UpdateCylinder(&this->actor, &this->collider);
     CollisionCheck_SetOC(globalCtx, &globalCtx->colChkCtx, &this->collider.base);
     Actor_MoveForward(&this->actor);
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, 4);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, UPDBGCHECKINFO_FLAG_2);
     if ((globalCtx->csCtx.state != CS_STATE_IDLE) && (globalCtx->csCtx.npcActions[0] != NULL)) {
         switch (this->unk_2AA) {
             case 0:
@@ -295,7 +291,7 @@ void EnAni_Update(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 s32 EnAni_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
-    EnAni* this = THIS;
+    EnAni* this = (EnAni*)thisx;
 
     if (limbIndex == 15) {
         rot->x += this->unk_29C.y;
@@ -306,28 +302,27 @@ s32 EnAni_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList,
 
 void EnAni_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
     static Vec3f sMultVec = { 800.0f, 500.0f, 0.0f };
-    EnAni* this = THIS;
+    EnAni* this = (EnAni*)thisx;
 
     if (limbIndex == 15) {
         Matrix_MultVec3f(&sMultVec, &this->actor.focus.pos);
     }
 }
 
-static u64* sEyeTextures[] = {
-    gRoofManEyeOpenTex,
-    gRoofManEyeHalfTex,
-    gRoofManEyeClosedTex,
-};
-
 void EnAni_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnAni* this = THIS;
+    static void* eyeTextures[] = {
+        gRoofManEyeOpenTex,
+        gRoofManEyeHalfTex,
+        gRoofManEyeClosedTex,
+    };
+    EnAni* this = (EnAni*)thisx;
     s32 pad;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_ani.c", 719);
 
     func_800943C8(globalCtx->state.gfxCtx);
 
-    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(sEyeTextures[this->eyeIndex]));
+    gSPSegment(POLY_OPA_DISP++, 0x08, SEGMENTED_TO_VIRTUAL(eyeTextures[this->eyeIndex]));
 
     SkelAnime_DrawFlexOpa(globalCtx, this->skelAnime.skeleton, this->skelAnime.jointTable, this->skelAnime.dListCount,
                           EnAni_OverrideLimbDraw, EnAni_PostLimbDraw, this);

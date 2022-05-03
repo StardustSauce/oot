@@ -1,9 +1,7 @@
 #include "z_en_fd_fire.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
-#define FLAGS 0x00000015
-
-#define THIS ((EnFdFire*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4)
 
 void EnFdFire_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnFdFire_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -122,15 +120,15 @@ s32 EnFdFire_CheckCollider(EnFdFire* this, GlobalContext* globalCtx) {
 }
 
 void EnFdFire_Init(Actor* thisx, GlobalContext* globalCtx) {
-    EnFdFire* this = THIS;
+    EnFdFire* this = (EnFdFire*)thisx;
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 20.0f);
     Collider_InitCylinder(globalCtx, &this->collider);
     Collider_SetCylinder(globalCtx, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, &sDamageTable, &sColChkInit);
-    this->actor.flags &= ~1;
+    this->actor.flags &= ~ACTOR_FLAG_0;
     this->actor.gravity = -0.6f;
     this->actor.speedXZ = 5.0f;
     this->actor.velocity.y = 12.0f;
@@ -141,7 +139,7 @@ void EnFdFire_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnFdFire_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnFdFire* this = THIS;
+    EnFdFire* this = (EnFdFire*)thisx;
 
     Collider_DestroyCylinder(globalCtx, &this->collider);
 }
@@ -153,10 +151,10 @@ void func_80A0E70C(EnFdFire* this, GlobalContext* globalCtx) {
     targetPos.x += this->spawnRadius * Math_SinS(this->actor.world.rot.y);
     targetPos.z += this->spawnRadius * Math_CosS(this->actor.world.rot.y);
     EnFdFire_UpdatePos(this, &targetPos);
-    if (this->actor.bgCheckFlags & 1 && (!(this->actor.velocity.y > 0.0f))) {
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && (!(this->actor.velocity.y > 0.0f))) {
         this->actor.velocity = velocity;
         this->actor.speedXZ = 0.0f;
-        this->actor.bgCheckFlags &= ~1;
+        this->actor.bgCheckFlags &= ~BGCHECKFLAG_GROUND;
         if (this->actor.params & 0x8000) {
             this->deathTimer = 200;
             this->actionFunc = EnFdFire_DanceTowardsPlayer;
@@ -174,7 +172,7 @@ void EnFdFire_WaitToDie(EnFdFire* this, GlobalContext* globalCtx) {
 }
 
 void EnFdFire_DanceTowardsPlayer(EnFdFire* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     f32 angles[] = {
         0.0f, 210.0f, 60.0f, 270.0f, 120.0f, 330.0f, 180.0f, 30.0f, 240.0f, 90.0f, 300.0f, 150.0f,
     };
@@ -210,7 +208,7 @@ void EnFdFire_Disappear(EnFdFire* this, GlobalContext* globalCtx) {
 }
 
 void EnFdFire_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnFdFire* this = THIS;
+    EnFdFire* this = (EnFdFire*)thisx;
     s32 pad;
 
     if (this->actionFunc != EnFdFire_Disappear) {
@@ -221,7 +219,7 @@ void EnFdFire_Update(Actor* thisx, GlobalContext* globalCtx) {
 
     func_8002D7EC(&this->actor);
     this->actionFunc(this, globalCtx);
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 12.0f, 10.0f, 0.0f, 5);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 12.0f, 10.0f, 0.0f, UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2);
 
     if (this->actionFunc != EnFdFire_Disappear) {
         Collider_UpdateCylinder(&this->actor, &this->collider);
@@ -240,7 +238,7 @@ void EnFdFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
         { 0, 10, 255, 255 },
     };
     s32 pad;
-    EnFdFire* this = THIS;
+    EnFdFire* this = (EnFdFire*)thisx;
     Vec3f scale = { 0.0f, 0.0f, 0.0f };
     Vec3f sp90 = { 0.0f, 0.0f, 0.0f };
     s16 sp8E;
@@ -251,15 +249,15 @@ void EnFdFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_fd_fire.c", 572);
 
     Matrix_Translate(this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, MTXMODE_NEW);
-    sp8E = Math_Vec3f_Yaw(&scale, &this->actor.velocity) - Camera_GetCamDirYaw(ACTIVE_CAM);
+    sp8E = Math_Vec3f_Yaw(&scale, &this->actor.velocity) - Camera_GetCamDirYaw(GET_ACTIVE_CAM(globalCtx));
     sp84 = fabsf(Math_CosS(sp8E));
     sp88 = Math_SinS(sp8E);
     sp80 = Math_Vec3f_DistXZ(&scale, &this->actor.velocity) / 1.5f;
     if (1) {}
     if (1) {}
     if (1) {}
-    Matrix_RotateY((s16)(Camera_GetCamDirYaw(ACTIVE_CAM) + 0x8000) * (M_PI / 0x8000), MTXMODE_APPLY);
-    Matrix_RotateZ(((sp88 * -10.0f) * sp80) * (M_PI / 180.0f), MTXMODE_APPLY);
+    Matrix_RotateY(BINANG_TO_RAD((s16)(Camera_GetCamDirYaw(GET_ACTIVE_CAM(globalCtx)) + 0x8000)), MTXMODE_APPLY);
+    Matrix_RotateZ(DEG_TO_RAD((sp88 * -10.0f) * sp80), MTXMODE_APPLY);
     scale.x = scale.y = scale.z = this->scale * 0.001f;
     Matrix_Scale(scale.x, scale.y, scale.z, MTXMODE_APPLY);
     sp84 = sp80 * ((0.01f * -15.0f) * sp84) + 1.0f;
@@ -282,7 +280,7 @@ void EnFdFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
                    envColors[((this->actor.params & 0x8000) >> 0xF)].b,
                    envColors[((this->actor.params & 0x8000) >> 0xF)].a);
     gDPPipeSync(POLY_XLU_DISP++);
-    gSPDisplayList(POLY_XLU_DISP++, &gEffFire1DL);
+    gSPDisplayList(POLY_XLU_DISP++, gEffFire1DL);
 
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_en_fd_fire.c", 672);
 }

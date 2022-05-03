@@ -1,5 +1,5 @@
-#ifndef _Z_BG_YDAN_SP_H_
-#define _Z_BG_YDAN_SP_H_
+#ifndef Z_BG_YDAN_SP_H
+#define Z_BG_YDAN_SP_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -14,11 +14,9 @@ typedef struct BgYdanSp {
     /* 0x0168 */ u8 isDestroyedSwitchFlag;
     /* 0x0169 */ u8 burnSwitchFlag;
     /* 0x016A */ s16 timer;
-    /* 0x016C */ f32 unk16C;
+    /* 0x016C */ f32 unk_16C;
     /* 0x0170 */ ColliderTris trisCollider;
     /* 0x0190 */ ColliderTrisElement trisColliderItems[2];
 } BgYdanSp; // size = 0x0248
-
-extern const ActorInit Bg_Ydan_Sp_InitVars;
 
 #endif

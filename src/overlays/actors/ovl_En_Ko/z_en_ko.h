@@ -1,5 +1,5 @@
-#ifndef _Z_EN_KO_H_
-#define _Z_EN_KO_H_
+#ifndef Z_EN_KO_H
+#define Z_EN_KO_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -19,7 +19,7 @@ typedef struct EnKo {
     /* 0x0198 */ ColliderCylinder collider;
     /* 0x01E4 */ Path* path;
     /* 0x01E8 */ struct_80034A14_arg1 unk_1E8;
-    /* 0X0210 */ u8 unk_210; // block trade quest sfx
+    /* 0x0210 */ u8 unk_210; // block trade quest sfx
     /* 0x0212 */ s16 forestQuestState;
     /* 0x0214 */ s16 blinkTimer;
     /* 0x0216 */ s16 eyeTextureIndex;
@@ -31,8 +31,6 @@ typedef struct EnKo {
     /* 0x02E4 */ s16 unk_2E4[16];
     /* 0x0304 */ s16 unk_304[16];
 } EnKo; // size = 0x0324
-
-extern const ActorInit En_Ko_InitVars;
 
 typedef enum {
     ENKO_TYPE_CHILD_0,

@@ -7,9 +7,7 @@
 #include "z_bg_gnd_darkmeiro.h"
 #include "objects/object_demo_kekkai/object_demo_kekkai.h"
 
-#define FLAGS 0x00000030
-
-#define THIS ((BgGndDarkmeiro*)thisx)
+#define FLAGS (ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
 void BgGndDarkmeiro_Init(Actor* thisx, GlobalContext* globalCtx);
 void BgGndDarkmeiro_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -47,21 +45,21 @@ void BgGndDarkmeiro_ToggleBlock(BgGndDarkmeiro* this, GlobalContext* globalCtx) 
     }
 }
 
-void BgGndDarkmeiro_Init(Actor* thisx, GlobalContext* globalCtx) {
-    GlobalContext* globalCtx2 = globalCtx;
+void BgGndDarkmeiro_Init(Actor* thisx, GlobalContext* globalCtx2) {
+    GlobalContext* globalCtx = globalCtx2;
     CollisionHeader* colHeader = NULL;
-    BgGndDarkmeiro* this = THIS;
+    BgGndDarkmeiro* this = (BgGndDarkmeiro*)thisx;
 
     this->updateFunc = BgGndDarkmeiro_Noop;
     Actor_SetScale(&this->dyna.actor, 0.1f);
     switch (this->dyna.actor.params & 0xFF) {
         case DARKMEIRO_INVISIBLE_PATH:
             this->dyna.actor.draw = BgGndDarkmeiro_DrawInvisiblePath;
-            this->dyna.actor.flags |= 0x80;
+            this->dyna.actor.flags |= ACTOR_FLAG_7;
             break;
         case DARKMEIRO_CLEAR_BLOCK:
             CollisionHeader_GetVirtual(&gClearBlockCol, &colHeader);
-            this->dyna.bgId = DynaPoly_SetBgActor(globalCtx2, &globalCtx2->colCtx.dyna, &this->dyna.actor, colHeader);
+            this->dyna.bgId = DynaPoly_SetBgActor(globalCtx, &globalCtx->colCtx.dyna, &this->dyna.actor, colHeader);
             if (((this->dyna.actor.params >> 8) & 0x3F) == 0x3F) {
                 this->updateFunc = BgGndDarkmeiro_UpdateStaticBlock;
                 this->dyna.actor.draw = BgGndDarkmeiro_DrawStaticBlock;
@@ -69,8 +67,8 @@ void BgGndDarkmeiro_Init(Actor* thisx, GlobalContext* globalCtx) {
                 this->actionFlags = this->timer1 = this->timer2 = 0;
                 thisx->draw = BgGndDarkmeiro_DrawSwitchBlock;
                 this->updateFunc = BgGndDarkmeiro_UpdateSwitchBlock;
-                if (!Flags_GetSwitch(globalCtx2, (this->dyna.actor.params >> 8) & 0x3F)) {
-                    func_8003EBF8(globalCtx2, &globalCtx2->colCtx.dyna, this->dyna.bgId);
+                if (!Flags_GetSwitch(globalCtx, (this->dyna.actor.params >> 8) & 0x3F)) {
+                    func_8003EBF8(globalCtx, &globalCtx->colCtx.dyna, this->dyna.bgId);
                 } else {
                     this->timer1 = 64;
                     this->actionFlags |= 2;
@@ -81,30 +79,30 @@ void BgGndDarkmeiro_Init(Actor* thisx, GlobalContext* globalCtx) {
             this->actionFlags = this->timer1 = this->timer2 = 0;
             this->updateFunc = BgGndDarkmeiro_UpdateBlockTimer;
             thisx->draw = NULL;
-            if (Flags_GetSwitch(globalCtx2, ((this->dyna.actor.params >> 8) & 0x3F) + 1)) {
+            if (Flags_GetSwitch(globalCtx, ((this->dyna.actor.params >> 8) & 0x3F) + 1)) {
                 this->timer1 = 64;
                 this->actionFlags |= 4;
             }
-            if (Flags_GetSwitch(globalCtx2, ((this->dyna.actor.params >> 8) & 0x3F) + 2)) {
+            if (Flags_GetSwitch(globalCtx, ((this->dyna.actor.params >> 8) & 0x3F) + 2)) {
                 this->timer2 = 64;
                 this->actionFlags |= 8;
             }
             if ((this->timer1 != 0) || (this->timer2 != 0)) {
-                Flags_SetSwitch(globalCtx2, (this->dyna.actor.params >> 8) & 0x3F);
+                Flags_SetSwitch(globalCtx, (this->dyna.actor.params >> 8) & 0x3F);
             } else {
-                Flags_UnsetSwitch(globalCtx2, (this->dyna.actor.params >> 8) & 0x3F);
+                Flags_UnsetSwitch(globalCtx, (this->dyna.actor.params >> 8) & 0x3F);
             }
             break;
     }
 }
 
-void BgGndDarkmeiro_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    GlobalContext* globalCtx2 = globalCtx;
-    BgGndDarkmeiro* this = THIS;
+void BgGndDarkmeiro_Destroy(Actor* thisx, GlobalContext* globalCtx2) {
+    GlobalContext* globalCtx = globalCtx2;
+    BgGndDarkmeiro* this = (BgGndDarkmeiro*)thisx;
 
     if ((this->dyna.actor.params & 0xFF) == 1) {
         if (1) {}
-        DynaPoly_DeleteBgActor(globalCtx2, &globalCtx2->colCtx.dyna, this->dyna.bgId);
+        DynaPoly_DeleteBgActor(globalCtx, &globalCtx->colCtx.dyna, this->dyna.bgId);
     }
 }
 
@@ -125,7 +123,8 @@ void BgGndDarkmeiro_UpdateBlockTimer(BgGndDarkmeiro* this, GlobalContext* global
         } else {
             this->actionFlags |= 4;
             this->timer1 = 304;
-            Audio_PlaySoundGeneral(NA_SE_EV_RED_EYE, &D_801333D4, 4, &D_801333E0, &D_801333E0, &D_801333E8);
+            Audio_PlaySoundGeneral(NA_SE_EV_RED_EYE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     }
 
@@ -140,7 +139,8 @@ void BgGndDarkmeiro_UpdateBlockTimer(BgGndDarkmeiro* this, GlobalContext* global
         } else {
             this->actionFlags |= 8;
             this->timer2 = 304;
-            Audio_PlaySoundGeneral(NA_SE_EV_RED_EYE, &D_801333D4, 4, &D_801333E0, &D_801333E0, &D_801333E8);
+            Audio_PlaySoundGeneral(NA_SE_EV_RED_EYE, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
     }
 
@@ -170,9 +170,9 @@ void BgGndDarkmeiro_UpdateSwitchBlock(BgGndDarkmeiro* this, GlobalContext* globa
     BgGndDarkmeiro_ToggleBlock(this, globalCtx);
 }
 
-void BgGndDarkmeiro_Update(Actor* thisx, GlobalContext* globalCtx) {
-    BgGndDarkmeiro* this = THIS;
-    GlobalContext* globalCtx2 = globalCtx;
+void BgGndDarkmeiro_Update(Actor* thisx, GlobalContext* globalCtx2) {
+    BgGndDarkmeiro* this = (BgGndDarkmeiro*)thisx;
+    GlobalContext* globalCtx = globalCtx2;
 
     this->updateFunc(this, globalCtx2);
 }
@@ -182,7 +182,7 @@ void BgGndDarkmeiro_DrawInvisiblePath(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void BgGndDarkmeiro_DrawSwitchBlock(Actor* thisx, GlobalContext* globalCtx) {
-    BgGndDarkmeiro* this = THIS;
+    BgGndDarkmeiro* this = (BgGndDarkmeiro*)thisx;
     s16 vanishTimer;
 
     vanishTimer = this->timer1;

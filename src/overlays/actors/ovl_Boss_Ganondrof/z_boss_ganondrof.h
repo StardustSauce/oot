@@ -1,5 +1,5 @@
-#ifndef _Z_BOSS_GANONDROF_H_
-#define _Z_BOSS_GANONDROF_H_
+#ifndef Z_BOSS_GANONDROF_H
+#define Z_BOSS_GANONDROF_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -42,7 +42,7 @@ typedef enum {
     /*  9 */ GND_THROW_COUNT,
     /* 10 */ GND_MASK_OFF,
     /* 11 */ GND_EYE_STATE,
-    /* 12 */ GND_PARTICLE_ANGLE,
+    /* 12 */ GND_EFFECT_ANGLE,
     /* 13 */ GND_BODY_DECAY_INDEX,
     /* 14 */ GND_BODY_DECAY_FLAG,
     /* 15 */ GND_LIMB_DECAY_INDEX,
@@ -100,7 +100,5 @@ typedef struct BossGanondrof {
     /* 0x04E0 */ ColliderCylinder colliderBody;
     /* 0x052C */ ColliderCylinder colliderSpear;
 } BossGanondrof; // size = 0x0578
-
-extern const ActorInit Boss_Ganondrof_InitVars;
 
 #endif

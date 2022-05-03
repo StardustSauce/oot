@@ -1,23 +1,23 @@
-#ifndef _Z_DOOR_SHUTTER_H_
-#define _Z_DOOR_SHUTTER_H_
+#ifndef Z_DOOR_SHUTTER_H
+#define Z_DOOR_SHUTTER_H
 
 #include "ultra64.h"
 #include "global.h"
 
 /**
  * Actor Parameters
- * 
+ *
  * |                  |         |
  * | Transition Index | Type    | Switch Flag
  * |------------------|---------|-------------
- * | 0 0 0 0 0 0      | 0 0 0 0 | 0 0 0 0 0 0 
+ * | 0 0 0 0 0 0      | 0 0 0 0 | 0 0 0 0 0 0
  * | 6                | 4       | 6
  * |
- * 
+ *
  * Transition Index     1111110000000000    Set by the actor engine when the door is spawned
  * Type                 0000001111000000
  * Switch Flag          0000000000111111
- * 
+ *
  */
 
 typedef enum {
@@ -57,7 +57,5 @@ typedef struct DoorShutter {
     /* 0x0170 */ f32 unk_170;
     /* 0x0174 */ DoorShutterActionFunc actionFunc;
 } DoorShutter; // size = 0x0178
-
-extern const ActorInit Door_Shutter_InitVars;
 
 #endif

@@ -76,7 +76,7 @@ void Lights_Draw(Lights* lights, GraphicsContext* gfxCtx) {
 
     if (0) {}
 
-    i++; // abmient light is total number of lights + 1
+    i++; // ambient light is total number of lights + 1
     gSPLight(POLY_OPA_DISP++, &lights->l.a, i);
     gSPLight(POLY_XLU_DISP++, &lights->l.a, i);
 
@@ -198,29 +198,29 @@ s32 Lights_FreeNode(LightNode* light) {
 void LightContext_Init(GlobalContext* globalCtx, LightContext* lightCtx) {
     LightContext_InitList(globalCtx, lightCtx);
     LightContext_SetAmbientColor(lightCtx, 80, 80, 80);
-    func_8007A698(lightCtx, 0, 0, 0, 0x3E4, 0x3200);
+    LightContext_SetFog(lightCtx, 0, 0, 0, 996, 12800);
     bzero(&sLightsBuffer, sizeof(sLightsBuffer));
 }
 
 void LightContext_SetAmbientColor(LightContext* lightCtx, u8 r, u8 g, u8 b) {
-    lightCtx->ambient.r = r;
-    lightCtx->ambient.g = g;
-    lightCtx->ambient.b = b;
+    lightCtx->ambientColor[0] = r;
+    lightCtx->ambientColor[1] = g;
+    lightCtx->ambientColor[2] = b;
 }
 
-void func_8007A698(LightContext* lightCtx, u8 arg1, u8 arg2, u8 arg3, s16 numLights, s16 arg5) {
-    lightCtx->unk_07 = arg1;
-    lightCtx->unk_08 = arg2;
-    lightCtx->unk_09 = arg3;
-    lightCtx->unk_0A = numLights;
-    lightCtx->unk_0C = arg5;
+void LightContext_SetFog(LightContext* lightCtx, u8 r, u8 g, u8 b, s16 fogNear, s16 fogFar) {
+    lightCtx->fogColor[0] = r;
+    lightCtx->fogColor[1] = g;
+    lightCtx->fogColor[2] = b;
+    lightCtx->fogNear = fogNear;
+    lightCtx->fogFar = fogFar;
 }
 
 /**
  * Allocate a new Lights group and initilize the ambient color with that provided by LightContext
  */
 Lights* LightContext_NewLights(LightContext* lightCtx, GraphicsContext* gfxCtx) {
-    return Lights_New(gfxCtx, lightCtx->ambient.r, lightCtx->ambient.g, lightCtx->ambient.b);
+    return Lights_New(gfxCtx, lightCtx->ambientColor[0], lightCtx->ambientColor[1], lightCtx->ambientColor[2]);
 }
 
 void LightContext_InitList(GlobalContext* globalCtx, LightContext* lightCtx) {
@@ -321,7 +321,7 @@ void Lights_GlowCheck(GlobalContext* globalCtx) {
     LightPoint* params;
     Vec3f pos;
     Vec3f multDest;
-    f32 wDest;
+    f32 cappedInvWDest;
     f32 wX;
     f32 wY;
     s32 wZ;
@@ -336,13 +336,13 @@ void Lights_GlowCheck(GlobalContext* globalCtx) {
             pos.x = params->x;
             pos.y = params->y;
             pos.z = params->z;
-            func_8002BE04(globalCtx, &pos, &multDest, &wDest);
+            Actor_ProjectPos(globalCtx, &pos, &multDest, &cappedInvWDest);
             params->drawGlow = false;
-            wX = multDest.x * wDest;
-            wY = multDest.y * wDest;
+            wX = multDest.x * cappedInvWDest;
+            wY = multDest.y * cappedInvWDest;
 
             if ((multDest.z > 1.0f) && (fabsf(wX) < 1.0f) && (fabsf(wY) < 1.0f)) {
-                wZ = (s32)((multDest.z * wDest) * 16352.0f) + 16352;
+                wZ = (s32)((multDest.z * cappedInvWDest) * 16352.0f) + 16352;
                 zBuf = gZBuffer[(s32)((wY * -120.0f) + 120.0f)][(s32)((wX * 160.0f) + 160.0f)] * 4;
                 if (1) {}
                 if (1) {}

@@ -1,5 +1,5 @@
-#ifndef _Z_EN_SKJ_H_
-#define _Z_EN_SKJ_H_
+#ifndef Z_EN_SKJ_H
+#define Z_EN_SKJ_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -23,7 +23,7 @@ typedef struct EnSkj {
     /* 0x02CE */ s16 dodgeResetTimer;
     /* 0x02D0 */ u8 animIndex;
     /* 0x02D1 */ u8 action;
-    /* 0x02D2 */ u8 backfilpFlag;
+    /* 0x02D2 */ u8 backflipFlag;
     /* 0x02D3 */ u8 unk_2D3; // Is set to zero when walking to trade for skull mask and set to 1 when dying
     /* 0x02D4 */ u8 needlesToShoot;
     /* 0x02D5 */ u8 hitsUntilDodge; // Upon reaching zero will always backflip to avoid stun lock
@@ -36,7 +36,5 @@ typedef struct EnSkj {
     /* 0x02F0 */ f32 unk_2F0;
     /* 0x02F4 */ Vec3f posCopy;
 } EnSkj; // size = 0x0300
-
-extern const ActorInit En_Skj_InitVars;
 
 #endif

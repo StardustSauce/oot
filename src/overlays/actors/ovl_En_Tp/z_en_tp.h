@@ -1,5 +1,5 @@
-#ifndef _Z_EN_TP_H_
-#define _Z_EN_TP_H_
+#ifndef Z_EN_TP_H
+#define Z_EN_TP_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -15,7 +15,7 @@ typedef struct EnTp {
     /* 0x0154 */ EnTpActionFunc actionFunc;
     /* 0x0158 */ u8 damageEffect; // Used to propagate the effect to the other segments' actors
     /* 0x015A */ s16 timer;
-    /* 0x015C */ s16 unk_15C; // Multipurpose, used to change the horizontal position of tail segments 
+    /* 0x015C */ s16 unk_15C; // Multipurpose, used to change the horizontal position of tail segments
     /* 0x015E */ s16 alpha; // The dying types fade away
     /* 0x0160 */ s16 red;
     /* 0x0162 */ s16 kiraSpawnTimer;
@@ -35,7 +35,5 @@ typedef enum {
     /* 11 */ TAILPASARAN_TAIL_DYING,
     /* 12 */ TAILPASARAN_HEAD_DYING
 } EnTpType;
-
-extern const ActorInit En_Tp_InitVars;
 
 #endif

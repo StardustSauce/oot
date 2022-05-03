@@ -7,9 +7,7 @@
 #include "z_door_gerudo.h"
 #include "objects/object_door_gerudo/object_door_gerudo.h"
 
-#define FLAGS 0x00000000
-
-#define THIS ((DoorGerudo*)thisx)
+#define FLAGS 0
 
 void DoorGerudo_Init(Actor* thisx, GlobalContext* globalCtx);
 void DoorGerudo_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -37,11 +35,9 @@ static InitChainEntry sInitChain[] = {
     ICHAIN_VEC3F(scale, 1, ICHAIN_STOP),
 };
 
-extern UNK_TYPE D_80994B70;
-
 void DoorGerudo_Init(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    DoorGerudo* this = THIS;
+    DoorGerudo* this = (DoorGerudo*)thisx;
     CollisionHeader* colHeader = NULL;
 
     Actor_ProcessInitChain(&this->dyna.actor, sInitChain);
@@ -58,13 +54,13 @@ void DoorGerudo_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void DoorGerudo_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    DoorGerudo* this = THIS;
+    DoorGerudo* this = (DoorGerudo*)thisx;
 
     DynaPoly_DeleteBgActor(globalCtx, &globalCtx->colCtx.dyna, this->dyna.bgId);
 }
 
 f32 func_809946BC(GlobalContext* globalCtx, DoorGerudo* this, f32 arg2, f32 arg3, f32 arg4) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Vec3f playerPos;
     Vec3f sp1C;
 
@@ -81,7 +77,7 @@ f32 func_809946BC(GlobalContext* globalCtx, DoorGerudo* this, f32 arg2, f32 arg3
 }
 
 s32 func_80994750(DoorGerudo* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     f32 temp_f0;
     s16 rotYDiff;
 
@@ -110,7 +106,7 @@ void func_8099485C(DoorGerudo* this, GlobalContext* globalCtx) {
         s32 direction = func_80994750(this, globalCtx);
 
         if (direction != 0) {
-            Player* player = PLAYER;
+            Player* player = GET_PLAYER(globalCtx);
 
             if (gSaveContext.inventory.dungeonKeys[gSaveContext.mapIndex] <= 0) {
                 player->naviTextId = -0x203;
@@ -139,13 +135,13 @@ void func_809949C8(DoorGerudo* this, GlobalContext* globalCtx) {
 }
 
 void DoorGerudo_Update(Actor* thisx, GlobalContext* globalCtx) {
-    DoorGerudo* this = THIS;
+    DoorGerudo* this = (DoorGerudo*)thisx;
 
     this->actionFunc(this, globalCtx);
 }
 
 void DoorGerudo_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    DoorGerudo* this = THIS;
+    DoorGerudo* this = (DoorGerudo*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_door_gerudo.c", 361);
 
@@ -157,7 +153,7 @@ void DoorGerudo_Draw(Actor* thisx, GlobalContext* globalCtx) {
 
     if (this->unk_166 != 0) {
         Matrix_Scale(0.01f, 0.01f, 0.025f, MTXMODE_APPLY);
-        Actor_DrawDoorLock(globalCtx, this->unk_166, 0);
+        Actor_DrawDoorLock(globalCtx, this->unk_166, DOORLOCK_NORMAL);
     }
 
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_door_gerudo.c", 377);

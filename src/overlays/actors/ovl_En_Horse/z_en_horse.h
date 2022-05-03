@@ -1,5 +1,5 @@
-#ifndef _Z_EN_HORSE_H_
-#define _Z_EN_HORSE_H_
+#ifndef Z_EN_HORSE_H
+#define Z_EN_HORSE_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -98,7 +98,7 @@ typedef struct EnHorse {
     /* 0x0154 */ s32 noInputTimerMax;
     /* 0x0158 */ s32 type;
     /* 0x015C */ s8 bankIndex;
-    /* 0x0160 */ PSkinAwb skin;
+    /* 0x0160 */ Skin skin;
     /* 0x01F0 */ u32 stateFlags;
     /* 0x01F4 */ Vec3f lastPos;
     /* 0x0200 */ s16 lastYaw;
@@ -187,7 +187,5 @@ typedef struct EnHorse {
     (((horseActor)->stateFlags & ENHORSE_JUMPING) \
         ? true                       \
         : false)
-
-extern const ActorInit En_Horse_InitVars;
 
 #endif

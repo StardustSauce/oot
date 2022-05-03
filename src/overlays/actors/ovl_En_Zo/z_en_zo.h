@@ -1,10 +1,12 @@
-#ifndef _Z_EN_ZO_H_
-#define _Z_EN_ZO_H_
+#ifndef Z_EN_ZO_H
+#define Z_EN_ZO_H
 
 #include "ultra64.h"
 #include "global.h"
 
 struct EnZo;
+
+#define EN_ZO_EFFECT_COUNT 15
 
 typedef struct {
     /* 0x00 */ u8 type;
@@ -28,7 +30,7 @@ typedef struct EnZo {
     /* 0x0208 */ u8 canSpeak;
     /* 0x020A */ Vec3s jointTable[20];
     /* 0x0282 */ Vec3s morphTable[20];
-    /* 0x02FC */ EnZoEffect effects[15];
+    /* 0x02FC */ EnZoEffect effects[EN_ZO_EFFECT_COUNT];
     /* 0x0644 */ f32 dialogRadius;
     /* 0x0648 */ f32 alpha;
     /* 0x064C */ s16 unk_64C;
@@ -39,7 +41,5 @@ typedef struct EnZo {
     /* 0x0656 */ s16 unk_656[20];
     /* 0x067E */ s16 unk_67E[20];
 } EnZo; // size = 0x06A8
-
-extern const ActorInit En_Zo_InitVars;
 
 #endif

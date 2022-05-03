@@ -1,5 +1,5 @@
-#ifndef _Z_EN_DODONGO_H_
-#define _Z_EN_DODONGO_H_
+#ifndef Z_EN_DODONGO_H
+#define Z_EN_DODONGO_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -29,7 +29,7 @@ typedef struct EnDodongo {
     /* 0x034C */ Vec3f bodyScale;
     /* 0x0358 */ Vec3f icePos[9];
     /* 0x03C4 */ Color_RGBA8 bombSmokePrimColor;
-    /* 0x03C8 */ Color_RGBA8 bombSmokeEnvColor; 
+    /* 0x03C8 */ Color_RGBA8 bombSmokeEnvColor;
     /* 0x03CC */ u8 damageEffect;
     /* 0x03D0 */ s32 blureIdx;
     /* 0x03D4 */ ColliderQuad colliderAT;
@@ -43,7 +43,5 @@ typedef enum {
     EN_DODONGO_NORMAL = -1,
     EN_DODONGO_SMOKE_DEATH
 } EnDodongoParam;
-
-extern const ActorInit En_Dodongo_InitVars;
 
 #endif

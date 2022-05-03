@@ -1,5 +1,5 @@
-#ifndef _Z_EN_HORSE_ZELDA_H_
-#define _Z_EN_HORSE_ZELDA_H_
+#ifndef Z_EN_HORSE_ZELDA_H
+#define Z_EN_HORSE_ZELDA_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -12,7 +12,7 @@ typedef struct EnHorseZelda {
     /* 0x0000 */ Actor actor;
     /* 0x014C */ s32 action;
     /* 0x0150 */ s32 animationIndex;
-    /* 0x0154 */ PSkinAwb skin;
+    /* 0x0154 */ Skin skin;
     /* 0x01E4 */ char unk_1E4[0x8];
     /* 0x01EC */ s32 unk_1EC;
     /* 0x01F0 */ char unk_1F0[0x4];
@@ -22,7 +22,5 @@ typedef struct EnHorseZelda {
     /* 0x0248 */ ColliderJntSph colliderSphere;
     /* 0x0268 */ ColliderJntSphElement colliderSphereItem;
 } EnHorseZelda; // size = 0x02A8
-
-extern const ActorInit En_Horse_Zelda_InitVars;
 
 #endif

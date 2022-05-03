@@ -1,24 +1,8 @@
 #include "z_en_daiku.h"
 #include "overlays/actors/ovl_En_GeldB/z_en_geldb.h"
+#include "objects/object_daiku/object_daiku.h"
 
-#define FLAGS 0x00000019
-
-#define THIS ((EnDaiku*)thisx)
-
-typedef struct {
-    AnimationHeader* anim;
-    f32 unk_4;
-    u8 mode;
-    f32 transitionRate;
-} EnDaikuAnimation;
-
-typedef enum {
-    /* 0 */ ENDAIKU_ANIM_SHOUT,
-    /* 1 */ ENDAIKU_ANIM_STAND,
-    /* 2 */ ENDAIKU_ANIM_CELEBRATE,
-    /* 3 */ ENDAIKU_ANIM_RUN,
-    /* 4 */ ENDAIKU_ANIM_SIT
-} EnDaikuAnimationIdx;
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_3 | ACTOR_FLAG_4)
 
 typedef struct {
     Vec3f eyePosDeltaLocal;
@@ -56,8 +40,6 @@ void EnDaiku_InitSubCamera(EnDaiku* this, GlobalContext* globalCtx);
 void EnDaiku_EscapeRun(EnDaiku* this, GlobalContext* globalCtx);
 s32 EnDaiku_OverrideLimbDraw(GlobalContext* globalCtx, s32 limb, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx);
 void EnDaiku_PostLimbDraw(GlobalContext* globalCtx, s32 limb, Gfx** dList, Vec3s* rot, void* thisx);
-
-extern FlexSkeletonHeader D_06007958;
 
 const ActorInit En_Daiku_InitVars = {
     ACTOR_EN_DAIKU,
@@ -128,9 +110,18 @@ static DamageTable sDamageTable = {
     /* Unknown 2     */ DMG_ENTRY(0, 0x0),
 };
 
-static EnDaikuAnimation sAnimations[] = {
-    { 0x06001AB0, 1.0f, 0, 0 }, { 0x06007DE0, 1.0f, 0, 0 }, { 0x0600885C, 1.0f, 0, 0 },
-    { 0x06000C44, 1.0f, 0, 0 }, { 0x06008164, 1.0f, 0, 0 },
+typedef enum {
+    /* 0 */ ENDAIKU_ANIM_SHOUT,
+    /* 1 */ ENDAIKU_ANIM_STAND,
+    /* 2 */ ENDAIKU_ANIM_CELEBRATE,
+    /* 3 */ ENDAIKU_ANIM_RUN,
+    /* 4 */ ENDAIKU_ANIM_SIT
+} EnDaikuAnimation;
+
+static AnimationFrameCountInfo sAnimationInfo[] = {
+    { &object_daiku_Anim_001AB0, 1.0f, 0, 0 }, { &object_daiku_Anim_007DE0, 1.0f, 0, 0 },
+    { &object_daiku_Anim_00885C, 1.0f, 0, 0 }, { &object_daiku_Anim_000C44, 1.0f, 0, 0 },
+    { &object_daiku_Anim_008164, 1.0f, 0, 0 },
 };
 
 static EnDaikuEscapeSubCamParam sEscapeSubCamParams[] = {
@@ -140,34 +131,34 @@ static EnDaikuEscapeSubCamParam sEscapeSubCamParams[] = {
     { { -40, 60, 60 }, 120 },
 };
 
-void EnDaiku_Change(EnDaiku* this, s32 animIndex, s32* currentAnimIndex) {
-    f32 transitionRate;
+void EnDaiku_ChangeAnim(EnDaiku* this, s32 index, s32* currentIndex) {
+    f32 morphFrames;
 
-    if (*currentAnimIndex < 0 || *currentAnimIndex == animIndex) {
-        transitionRate = 0.0f;
+    if (*currentIndex < 0 || *currentIndex == index) {
+        morphFrames = 0.0f;
     } else {
-        transitionRate = sAnimations[animIndex].transitionRate;
+        morphFrames = sAnimationInfo[index].morphFrames;
     }
 
-    Animation_Change(&this->skelAnime, sAnimations[animIndex].anim, 1.0f, 0.0f,
-                     Animation_GetLastFrame(sAnimations[animIndex].anim), sAnimations[animIndex].mode, transitionRate);
+    Animation_Change(&this->skelAnime, sAnimationInfo[index].animation, 1.0f, 0.0f,
+                     Animation_GetLastFrame(sAnimationInfo[index].animation), sAnimationInfo[index].mode, morphFrames);
 
-    *currentAnimIndex = animIndex;
+    *currentIndex = index;
 }
 
 void EnDaiku_Init(Actor* thisx, GlobalContext* globalCtx) {
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
     s32 pad;
     s32 noKill = true;
     s32 isFree = false;
 
-    if ((this->actor.params & 3) == 0 && (gSaveContext.eventChkInf[9] & 1)) {
+    if ((this->actor.params & 3) == 0 && GET_EVENTCHKINF(EVENTCHKINF_90)) {
         isFree = true;
-    } else if ((this->actor.params & 3) == 1 && (gSaveContext.eventChkInf[9] & 2)) {
+    } else if ((this->actor.params & 3) == 1 && GET_EVENTCHKINF(EVENTCHKINF_91)) {
         isFree = true;
-    } else if ((this->actor.params & 3) == 2 && (gSaveContext.eventChkInf[9] & 4)) {
+    } else if ((this->actor.params & 3) == 2 && GET_EVENTCHKINF(EVENTCHKINF_92)) {
         isFree = true;
-    } else if ((this->actor.params & 3) == 3 && (gSaveContext.eventChkInf[9] & 8)) {
+    } else if ((this->actor.params & 3) == 3 && GET_EVENTCHKINF(EVENTCHKINF_93)) {
         isFree = true;
     }
 
@@ -181,7 +172,8 @@ void EnDaiku_Init(Actor* thisx, GlobalContext* globalCtx) {
     this->actor.shape.rot.z = 0;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 40.0f);
-    SkelAnime_InitFlex(globalCtx, &this->skelAnime, &D_06007958, NULL, this->jointTable, this->morphTable, 17);
+    SkelAnime_InitFlex(globalCtx, &this->skelAnime, &object_daiku_Skel_007958, NULL, this->jointTable, this->morphTable,
+                       17);
 
     if (!noKill) {
         Actor_Kill(&this->actor);
@@ -192,10 +184,11 @@ void EnDaiku_Init(Actor* thisx, GlobalContext* globalCtx) {
     Collider_SetCylinder(globalCtx, &this->collider, &this->actor, &sCylinderInit);
     CollisionCheck_SetInfo2(&this->actor.colChkInfo, &sDamageTable, &sColChkInfoInit2);
 
-    Animation_Change(&this->skelAnime, sAnimations[0].anim, 1.0f, 0.0f, Animation_GetLastFrame(sAnimations[0].anim),
-                     sAnimations[0].mode, sAnimations[0].transitionRate);
+    Animation_Change(&this->skelAnime, sAnimationInfo[ENDAIKU_ANIM_SHOUT].animation, 1.0f, 0.0f,
+                     Animation_GetLastFrame(sAnimationInfo[ENDAIKU_ANIM_SHOUT].animation),
+                     sAnimationInfo[ENDAIKU_ANIM_SHOUT].mode, sAnimationInfo[ENDAIKU_ANIM_SHOUT].morphFrames);
 
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, 4);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, UPDBGCHECKINFO_FLAG_2);
 
     this->actor.targetMode = 6;
     this->currentAnimIndex = -1;
@@ -204,15 +197,15 @@ void EnDaiku_Init(Actor* thisx, GlobalContext* globalCtx) {
     this->initPos = this->actor.world.pos;
 
     if (globalCtx->sceneNum == SCENE_GERUDOWAY) {
-        EnDaiku_Change(this, ENDAIKU_ANIM_STAND, &this->currentAnimIndex);
+        EnDaiku_ChangeAnim(this, ENDAIKU_ANIM_STAND, &this->currentAnimIndex);
         this->stateFlags |= ENDAIKU_STATEFLAG_1 | ENDAIKU_STATEFLAG_2;
         this->actionFunc = EnDaiku_Jailed;
     } else {
         if ((this->actor.params & 3) == 1 || (this->actor.params & 3) == 3) {
-            EnDaiku_Change(this, ENDAIKU_ANIM_SIT, &this->currentAnimIndex);
+            EnDaiku_ChangeAnim(this, ENDAIKU_ANIM_SIT, &this->currentAnimIndex);
             this->stateFlags |= ENDAIKU_STATEFLAG_1;
         } else {
-            EnDaiku_Change(this, ENDAIKU_ANIM_SHOUT, &this->currentAnimIndex);
+            EnDaiku_ChangeAnim(this, ENDAIKU_ANIM_SHOUT, &this->currentAnimIndex);
             this->stateFlags |= ENDAIKU_STATEFLAG_1 | ENDAIKU_STATEFLAG_2;
         }
 
@@ -222,7 +215,7 @@ void EnDaiku_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnDaiku_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
 
     Collider_DestroyCylinder(globalCtx, &this->collider);
 }
@@ -230,9 +223,9 @@ void EnDaiku_Destroy(Actor* thisx, GlobalContext* globalCtx) {
 s32 EnDaiku_UpdateTalking(EnDaiku* this, GlobalContext* globalCtx) {
     s32 newTalkState = ENDAIKU_STATE_TALKING;
 
-    if (func_8010BDBC(&globalCtx->msgCtx) == 6) {
+    if (Message_GetState(&globalCtx->msgCtx) == TEXT_STATE_DONE) {
         if (globalCtx->sceneNum == SCENE_GERUDOWAY) {
-            if (func_80106BC8(globalCtx) != 0) {
+            if (Message_ShouldAdvance(globalCtx)) {
                 if (this->actor.textId == 0x6007) {
                     Flags_SetSwitch(globalCtx, this->startFightSwitchFlag);
                     newTalkState = ENDAIKU_STATE_CAN_TALK;
@@ -242,13 +235,13 @@ s32 EnDaiku_UpdateTalking(EnDaiku* this, GlobalContext* globalCtx) {
                 }
             }
         } else if (globalCtx->sceneNum == SCENE_TENT) {
-            if (func_80106BC8(globalCtx) != 0) {
+            if (Message_ShouldAdvance(globalCtx)) {
                 switch (this->actor.textId) {
                     case 0x6061:
-                        gSaveContext.infTable[23] |= 0x40;
+                        SET_INFTABLE(INFTABLE_176);
                         break;
                     case 0x6064:
-                        gSaveContext.infTable[23] |= 0x100;
+                        SET_INFTABLE(INFTABLE_178);
                         break;
                 }
 
@@ -268,17 +261,18 @@ void EnDaiku_UpdateText(EnDaiku* this, GlobalContext* globalCtx) {
 
     if (this->talkState == ENDAIKU_STATE_TALKING) {
         this->talkState = EnDaiku_UpdateTalking(this, globalCtx);
-    } else if (func_8002F194(&this->actor, globalCtx)) {
+    } else if (Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
         this->talkState = ENDAIKU_STATE_TALKING;
     } else {
-        func_8002F374(globalCtx, &this->actor, &sp2E, &sp2C);
+        Actor_GetScreenPos(globalCtx, &this->actor, &sp2E, &sp2C);
         if (sp2E >= 0 && sp2E <= 320 && sp2C >= 0 && sp2C <= 240 && this->talkState == ENDAIKU_STATE_CAN_TALK &&
             func_8002F2CC(&this->actor, globalCtx, 100.0f) == 1) {
             if (globalCtx->sceneNum == SCENE_GERUDOWAY) {
                 if (this->stateFlags & ENDAIKU_STATEFLAG_GERUDODEFEATED) {
                     freedCount = 0;
                     for (carpenterType = 0; carpenterType < 4; carpenterType++) {
-                        if (gSaveContext.eventChkInf[9] & (1 << carpenterType)) {
+                        if (gSaveContext.eventChkInf[EVENTCHKINF_90_91_92_93_INDEX] &
+                            (1 << (carpenterType + EVENTCHKINF_90_SHIFT))) {
                             freedCount++;
                         }
                     }
@@ -314,7 +308,7 @@ void EnDaiku_UpdateText(EnDaiku* this, GlobalContext* globalCtx) {
                         if (CHECK_QUEST_ITEM(QUEST_MEDALLION_SPIRIT)) {
                             this->actor.textId = 0x6063;
                         } else {
-                            if (!(gSaveContext.infTable[23] & 0x40)) {
+                            if (!GET_INFTABLE(INFTABLE_176)) {
                                 this->actor.textId = 0x6061;
                             } else {
                                 this->actor.textId = 0x6062;
@@ -325,7 +319,7 @@ void EnDaiku_UpdateText(EnDaiku* this, GlobalContext* globalCtx) {
                         if (CHECK_QUEST_ITEM(QUEST_MEDALLION_SPIRIT)) {
                             this->actor.textId = 0x6066;
                         } else {
-                            if (!(gSaveContext.infTable[23] & 0x100)) {
+                            if (!GET_INFTABLE(INFTABLE_178)) {
                                 this->actor.textId = 0x6064;
                             } else {
                                 this->actor.textId = 0x6065;
@@ -370,11 +364,11 @@ void EnDaiku_Jailed(EnDaiku* this, GlobalContext* globalCtx) {
     if (gerudo == NULL) {
         this->stateFlags |= ENDAIKU_STATEFLAG_GERUDODEFEATED;
         this->stateFlags &= ~ENDAIKU_STATEFLAG_GERUDOFIGHTING;
-        EnDaiku_Change(this, ENDAIKU_ANIM_CELEBRATE, &this->currentAnimIndex);
+        EnDaiku_ChangeAnim(this, ENDAIKU_ANIM_CELEBRATE, &this->currentAnimIndex);
         this->actionFunc = EnDaiku_WaitFreedom;
     } else if (!(this->stateFlags & ENDAIKU_STATEFLAG_GERUDOFIGHTING) && !gerudo->invisible) {
         this->stateFlags |= ENDAIKU_STATEFLAG_GERUDOFIGHTING;
-        this->actor.flags &= ~9;
+        this->actor.flags &= ~(ACTOR_FLAG_0 | ACTOR_FLAG_3);
     }
 }
 
@@ -386,7 +380,7 @@ void EnDaiku_WaitFreedom(EnDaiku* this, GlobalContext* globalCtx) {
     SkelAnime_Update(&this->skelAnime);
 
     if (Flags_GetSwitch(globalCtx, this->actor.params >> 8 & 0x3F)) {
-        this->actor.flags |= 9;
+        this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_3;
         EnDaiku_UpdateText(this, globalCtx);
     }
 }
@@ -402,11 +396,11 @@ void EnDaiku_InitEscape(EnDaiku* this, GlobalContext* globalCtx) {
     Vec3s* pointPos;
     s32 exitLoop;
 
-    func_800F5C64(0x51);
-    EnDaiku_Change(this, ENDAIKU_ANIM_RUN, &this->currentAnimIndex);
+    Audio_PlayFanfare(NA_BGM_APPEAR);
+    EnDaiku_ChangeAnim(this, ENDAIKU_ANIM_RUN, &this->currentAnimIndex);
     this->stateFlags &= ~(ENDAIKU_STATEFLAG_1 | ENDAIKU_STATEFLAG_2);
 
-    gSaveContext.eventChkInf[9] |= 1 << (this->actor.params & 3);
+    gSaveContext.eventChkInf[EVENTCHKINF_90_91_92_93_INDEX] |= 1 << ((this->actor.params & 3) + EVENTCHKINF_90_SHIFT);
 
     this->actor.gravity = -1.0f;
     this->escapeSubCamTimer = sEscapeSubCamParams[this->actor.params & 3].maxFramesActive;
@@ -418,7 +412,7 @@ void EnDaiku_InitEscape(EnDaiku* this, GlobalContext* globalCtx) {
         pointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->waypoint;
         dx = pointPos->x - this->actor.world.pos.x;
         dz = pointPos->z - this->actor.world.pos.z;
-        this->rotYtowardsPath = Math_FAtan2F(dx, dz) * (0x8000 / M_PI);
+        this->rotYtowardsPath = RAD_TO_BINANG(Math_FAtan2F(dx, dz));
         dxz = sqrtf(SQ(dx) + SQ(dz));
         if (dxz > 10.0f) {
             exitLoop = true;
@@ -455,7 +449,7 @@ void EnDaiku_InitSubCamera(EnDaiku* this, GlobalContext* globalCtx) {
     eyePosDeltaLocal.x = sEscapeSubCamParams[this->actor.params & 3].eyePosDeltaLocal.x;
     eyePosDeltaLocal.y = sEscapeSubCamParams[this->actor.params & 3].eyePosDeltaLocal.y;
     eyePosDeltaLocal.z = sEscapeSubCamParams[this->actor.params & 3].eyePosDeltaLocal.z;
-    Matrix_RotateY(this->actor.world.rot.y * (M_PI / 0x8000), MTXMODE_NEW);
+    Matrix_RotateY(BINANG_TO_RAD(this->actor.world.rot.y), MTXMODE_NEW);
     Matrix_MultVec3f(&eyePosDeltaLocal, &eyePosDeltaWorld);
 
     this->subCamEyeInit.x = this->subCamEye.x = this->actor.world.pos.x + eyePosDeltaWorld.x;
@@ -501,12 +495,13 @@ void EnDaiku_EscapeSuccess(EnDaiku* this, GlobalContext* globalCtx) {
     Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_ACTIVE);
     this->subCamActive = false;
 
-    if ((gSaveContext.eventChkInf[9] & 0xF) == 0xF) {
-        Matrix_RotateY(this->initRot.y * (M_PI / 0x8000), MTXMODE_NEW);
+    if (CHECK_FLAG_ALL(gSaveContext.eventChkInf[EVENTCHKINF_90_91_92_93_INDEX],
+                       EVENTCHKINF_90_MASK | EVENTCHKINF_91_MASK | EVENTCHKINF_92_MASK | EVENTCHKINF_93_MASK)) {
+        Matrix_RotateY(BINANG_TO_RAD(this->initRot.y), MTXMODE_NEW);
         Matrix_MultVec3f(&D_809E4148, &vec);
         gerudoGuard =
             Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_EN_GE3, this->initPos.x + vec.x, this->initPos.y + vec.y,
-                        this->initPos.z + vec.z, 0, Math_FAtan2F(-vec.x, -vec.z) * (0x8000 / M_PI), 0, 2);
+                        this->initPos.z + vec.z, 0, RAD_TO_BINANG(Math_FAtan2F(-vec.x, -vec.z)), 0, 2);
 
         if (gerudoGuard == NULL) {
             Actor_Kill(&this->actor);
@@ -533,7 +528,7 @@ void EnDaiku_EscapeRun(EnDaiku* this, GlobalContext* globalCtx) {
     pointPos = (Vec3s*)SEGMENTED_TO_VIRTUAL(path->points) + this->waypoint;
     dx = pointPos->x - this->actor.world.pos.x;
     dz = pointPos->z - this->actor.world.pos.z;
-    ry = Math_FAtan2F(dx, dz) * (0x8000 / M_PI);
+    ry = RAD_TO_BINANG(Math_FAtan2F(dx, dz));
     dxz = sqrtf(SQ(dx) + SQ(dz));
     if (dxz <= 20.88f) {
         this->waypoint++;
@@ -550,7 +545,7 @@ void EnDaiku_EscapeRun(EnDaiku* this, GlobalContext* globalCtx) {
     this->actor.world.rot.y = this->actor.shape.rot.y;
     Math_SmoothStepToF(&this->actor.speedXZ, this->runSpeed, 0.6f, dxz, 0.0f);
     Actor_MoveForward(&this->actor);
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, 4);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 0.0f, 0.0f, UPDBGCHECKINFO_FLAG_2);
 
     if (this->subCamActive) {
         EnDaiku_UpdateSubCamera(this, globalCtx);
@@ -563,9 +558,9 @@ void EnDaiku_EscapeRun(EnDaiku* this, GlobalContext* globalCtx) {
 }
 
 void EnDaiku_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
     s32 curFrame;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (this->currentAnimIndex == ENDAIKU_ANIM_RUN) {
         curFrame = this->skelAnime.curFrame;
@@ -593,7 +588,7 @@ void EnDaiku_Update(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnDaiku_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_daiku.c", 1227);
 
@@ -616,7 +611,7 @@ void EnDaiku_Draw(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 s32 EnDaiku_OverrideLimbDraw(GlobalContext* globalCtx, s32 limb, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
 
     switch (limb) {
         case 8: // torso
@@ -633,9 +628,10 @@ s32 EnDaiku_OverrideLimbDraw(GlobalContext* globalCtx, s32 limb, Gfx** dList, Ve
 }
 
 void EnDaiku_PostLimbDraw(GlobalContext* globalCtx, s32 limb, Gfx** dList, Vec3s* rot, void* thisx) {
-    static Gfx* hairDLists[] = { 0x06005BD0, 0x06005AC0, 0x06005990, 0x06005880 };
+    static Gfx* hairDLists[] = { object_daiku_DL_005BD0, object_daiku_DL_005AC0, object_daiku_DL_005990,
+                                 object_daiku_DL_005880 };
     static Vec3f targetPosHeadLocal = { 700, 1100, 0 };
-    EnDaiku* this = THIS;
+    EnDaiku* this = (EnDaiku*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_daiku.c", 1323);
 

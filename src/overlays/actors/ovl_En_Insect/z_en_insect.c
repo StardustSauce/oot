@@ -8,9 +8,7 @@
 #include "vt.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 
-#define FLAGS 0x00000000
-
-#define THIS ((EnInsect*)thisx)
+#define FLAGS 0
 
 void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnInsect_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -95,7 +93,7 @@ f32 EnInsect_XZDistanceSquared(Vec3f* v1, Vec3f* v2) {
 
 s32 EnInsect_InBottleRange(EnInsect* this, GlobalContext* globalCtx) {
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Vec3f pos;
 
     if (this->actor.xzDistToPlayer < 32.0f) {
@@ -125,23 +123,23 @@ void func_80A7BF58(EnInsect* this) {
  */
 s32 EnInsect_FoundNearbySoil(EnInsect* this, GlobalContext* globalCtx) {
     Actor* currentActor;
-    f32 currentDistance;
-    f32 bestDistance;
+    f32 currentDistanceSq;
+    f32 bestDistanceSq;
     s32 ret;
 
     ret = 0;
     currentActor = globalCtx->actorCtx.actorLists[ACTORCAT_ITEMACTION].head;
-    bestDistance = 6400.0f;
+    bestDistanceSq = 6400.0f;
     this->soilActor = NULL;
 
     while (currentActor != NULL) {
         if (currentActor->id == ACTOR_OBJ_MAKEKINSUTA) {
-            currentDistance = Math3D_Dist2DSq(this->actor.world.pos.x, this->actor.world.pos.z,
-                                              currentActor->world.pos.x, currentActor->world.pos.z);
+            currentDistanceSq = Math3D_Dist2DSq(this->actor.world.pos.x, this->actor.world.pos.z,
+                                                currentActor->world.pos.x, currentActor->world.pos.z);
 
-            if (currentDistance < bestDistance && currentActor->room == this->actor.room) {
+            if (currentDistanceSq < bestDistanceSq && currentActor->room == this->actor.room) {
                 ret = 1;
-                bestDistance = currentDistance;
+                bestDistanceSq = currentDistanceSq;
                 this->soilActor = (ObjMakekinsuta*)currentActor;
             }
         }
@@ -164,8 +162,9 @@ void func_80A7C058(EnInsect* this) {
     }
 }
 
-void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx) {
-    EnInsect* this = THIS;
+void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx2) {
+    EnInsect* this = (EnInsect*)thisx;
+    GlobalContext* globalCtx = globalCtx2;
     f32 rand;
     s16 temp_s2;
     s32 count;
@@ -188,7 +187,7 @@ void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx) {
 
     if (this->unk_314 & 4) {
         this->unk_31C = Rand_S16Offset(200, 40);
-        this->actor.flags |= 0x10;
+        this->actor.flags |= ACTOR_FLAG_4;
     }
 
     if (temp_s2 == 2 || temp_s2 == 3) {
@@ -205,14 +204,10 @@ void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx) {
                 Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_EN_INSECT, this->actor.world.pos.x,
                             this->actor.world.pos.y, this->actor.world.pos.z, this->actor.shape.rot.x,
                             this->actor.shape.rot.y, this->actor.shape.rot.z, 3);
-
-                if (globalCtx) {}
             }
         }
 
         func_80A7D39C(this);
-
-        if (1) {}
 
         D_80A7DEB8++;
     } else {
@@ -230,7 +225,7 @@ void EnInsect_Init(Actor* thisx, GlobalContext* globalCtx) {
 
 void EnInsect_Destroy(Actor* thisx, GlobalContext* globalCtx) {
     s16 temp_v0;
-    EnInsect* this = THIS;
+    EnInsect* this = (EnInsect*)thisx;
 
     temp_v0 = this->actor.params & 3;
     Collider_DestroyJntSph(globalCtx, &this->collider);
@@ -265,9 +260,10 @@ void func_80A7C3F4(EnInsect* this, GlobalContext* globalCtx) {
     }
 
     if (((this->unk_314 & 4) && this->unk_31C <= 0) ||
-        ((sp2E == 2 || sp2E == 3) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & 1) && D_80A7DEB8 >= 4)) {
+        ((sp2E == 2 || sp2E == 3) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+         D_80A7DEB8 >= 4)) {
         func_80A7CBC8(this);
-    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & 0x40)) {
+    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_WATER_TOUCH)) {
         func_80A7CE60(this);
     } else if (this->actor.xzDistToPlayer < 40.0f) {
         func_80A7C818(this);
@@ -307,9 +303,10 @@ void func_80A7C5EC(EnInsect* this, GlobalContext* globalCtx) {
     }
 
     if (((this->unk_314 & 4) && this->unk_31C <= 0) ||
-        ((sp34 == 2 || sp34 == 3) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & 1) && D_80A7DEB8 >= 4)) {
+        ((sp34 == 2 || sp34 == 3) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+         D_80A7DEB8 >= 4)) {
         func_80A7CBC8(this);
-    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & 0x40)) {
+    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_WATER_TOUCH)) {
         func_80A7CE60(this);
     } else if (this->actor.xzDistToPlayer < 40.0f) {
         func_80A7C818(this);
@@ -349,7 +346,7 @@ void func_80A7C86C(EnInsect* this, GlobalContext* globalCtx) {
                 yaw -= 0x2000;
             }
         }
-        if (globalCtx) {}
+        if (globalCtx) {} // Must be 'globalCtx'
         Math_ScaledStepToS(&this->actor.world.rot.y, yaw, 2000);
     }
     this->actor.shape.rot.y = this->actor.world.rot.y;
@@ -358,7 +355,7 @@ void func_80A7C86C(EnInsect* this, GlobalContext* globalCtx) {
 
     if (this->unk_31A <= 0 || !sp38) {
         func_80A7C3A0(this);
-    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & 0x40)) {
+    } else if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_WATER_TOUCH)) {
         func_80A7CE60(this);
     }
 }
@@ -432,7 +429,7 @@ void func_80A7CC3C(EnInsect* this, GlobalContext* globalCtx) {
 
     if (this->unk_31A <= 0) {
         if ((this->unk_314 & 0x10) && this->soilActor != NULL &&
-            Math3D_Vec3fDistSq(&this->soilActor->actor.world.pos, &this->actor.world.pos) < 64.0f) {
+            Math3D_Vec3fDistSq(&this->soilActor->actor.world.pos, &this->actor.world.pos) < SQ(8.0f)) {
             this->soilActor->unk_152 = 1;
         }
         Actor_Kill(&this->actor);
@@ -450,7 +447,7 @@ void func_80A7CE60(EnInsect* this) {
 void func_80A7CEC0(EnInsect* this, GlobalContext* globalCtx) {
     f32 temp_f0;
     s16 temp_v1;
-    s16 padding;
+    s16 pad;
     s16 sp4E;
     Vec3f sp40;
     s32 phi_v0;
@@ -515,7 +512,7 @@ void func_80A7CEC0(EnInsect* this, GlobalContext* globalCtx) {
     if (this->unk_31A <= 0 || ((this->unk_314 & 4) && this->unk_31C <= 0) ||
         ((sp4E == 2 || sp4E == 3) && (this->unk_314 & 1) && D_80A7DEB8 >= 4)) {
         func_80A7D1F4(this);
-    } else if (!(this->actor.bgCheckFlags & 0x40)) {
+    } else if (!(this->actor.bgCheckFlags & BGCHECKFLAG_WATER_TOUCH)) {
         if (this->unk_314 & 0x10) {
             func_80A7D39C(this);
         } else {
@@ -583,14 +580,12 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
     } else {
         if (this->unk_314 & 0x10) {
             osSyncPrintf(VT_COL(YELLOW, BLACK));
-            // warning: target Actor is NULL
+            // "warning: target Actor is NULL"
             osSyncPrintf("warning:目標 Actor が NULL (%s %d)\n", "../z_en_mushi.c", 1046);
             osSyncPrintf(VT_RST);
         }
         sp40 = 40.0f;
     }
-
-    if (!this->soilActor->actor.params) {}
 
     D_80A7DEB0 += 0.99999994f / 300.0f;
     if (D_80A7DEB0 > 1.0f) {
@@ -641,7 +636,7 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
 
     Actor_SetScale(&this->actor, CLAMP_MAX(thisTemp->actor.scale.x + 0.0008f, 0.01f));
 
-    if (this->actor.bgCheckFlags & 1) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
         Math_SmoothStepToF(&this->actor.speedXZ, this->unk_324, 0.1f, 0.5f, 0.0f);
         Math_ScaledStepToS(&this->actor.world.rot.y, this->unk_328, 2000);
         sp50 = Math_ScaledStepToS(&this->actor.world.rot.x, 0, 2000);
@@ -669,7 +664,7 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
     }
 
     SkelAnime_Update(&this->skelAnime);
-    if (!(this->unk_314 & 0x40) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & 1)) {
+    if (!(this->unk_314 & 0x40) && (this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_MUSI_LAND);
         this->unk_314 |= 0x40;
     }
@@ -688,13 +683,13 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
         }
     }
 
-    if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & 0x40)) {
+    if ((this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_WATER_TOUCH)) {
         func_80A7CE60(this);
     } else if (this->unk_314 & 0x10) {
         if (sp40 < 9.0f) {
             func_80A7CBC8(this);
         } else if (this->unk_31A <= 0 || this->unk_31C <= 0 ||
-                   ((this->unk_314 & 1) && (this->actor.bgCheckFlags & 1) && D_80A7DEB8 >= 4 &&
+                   ((this->unk_314 & 1) && (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && D_80A7DEB8 >= 4 &&
                     (sp3A == 2 || sp3A == 3))) {
             func_80A7CBC8(this);
         } else {
@@ -710,7 +705,7 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
     } else if ((sp3A == 2 || sp3A == 3) && (this->unk_314 & 1) && this->unk_31C <= 0 && this->unk_31A <= 0 &&
                this->actor.floorHeight < BGCHECK_Y_MIN + 10.0f) {
         osSyncPrintf(VT_COL(YELLOW, BLACK));
-        // BG missing? To do Actor_delete
+        // "BG missing? To do Actor_delete"
         osSyncPrintf("BG 抜け？ Actor_delete します(%s %d)\n", "../z_en_mushi.c", 1197);
         osSyncPrintf(VT_RST);
         Actor_Kill(&this->actor);
@@ -718,7 +713,7 @@ void func_80A7D460(EnInsect* this, GlobalContext* globalCtx) {
 }
 
 void EnInsect_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnInsect* this = THIS;
+    EnInsect* this = (EnInsect*)thisx;
     s32 phi_v0;
 
     if (this->actor.child != NULL) {
@@ -743,7 +738,7 @@ void EnInsect_Update(Actor* thisx, GlobalContext* globalCtx) {
         Actor_MoveForward(&this->actor);
         if (this->unk_314 & 0x100) {
             if (this->unk_314 & 1) {
-                if (this->actor.bgCheckFlags & 1) {
+                if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
                     func_80A7C058(this);
                 }
             } else {
@@ -754,15 +749,15 @@ void EnInsect_Update(Actor* thisx, GlobalContext* globalCtx) {
         phi_v0 = 0;
 
         if (this->unk_314 & 1) {
-            phi_v0 = 4;
+            phi_v0 = UPDBGCHECKINFO_FLAG_2;
         }
 
         if (this->unk_314 & 2) {
-            phi_v0 |= 1;
+            phi_v0 |= UPDBGCHECKINFO_FLAG_0;
         }
 
         if (phi_v0 != 0) {
-            phi_v0 |= 0x40;
+            phi_v0 |= UPDBGCHECKINFO_FLAG_6;
             Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 8.0f, 5.0f, 0.0f, phi_v0);
         }
 
@@ -792,7 +787,7 @@ void EnInsect_Update(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnInsect_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnInsect* this = THIS;
+    EnInsect* this = (EnInsect*)thisx;
 
     func_80093D18(globalCtx->state.gfxCtx);
     SkelAnime_DrawOpa(globalCtx, this->skelAnime.skeleton, this->skelAnime.jointTable, NULL, NULL, NULL);

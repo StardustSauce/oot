@@ -8,9 +8,7 @@
 #include "objects/object_ru1/object_ru1.h"
 #include "vt.h"
 
-#define FLAGS 0x04000011
-
-#define THIS ((EnRu1*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_4 | ACTOR_FLAG_26)
 
 void EnRu1_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnRu1_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -171,7 +169,7 @@ void func_80AEACDC(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEAD20(Actor* thisx, GlobalContext* globalCtx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     Collider_InitCylinder(globalCtx, &this->collider);
     Collider_SetCylinderType1(globalCtx, &this->collider, &this->actor, &sCylinderInit1);
@@ -202,7 +200,7 @@ u8 func_80AEADF0(EnRu1* this) {
 }
 
 void EnRu1_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     EnRu1_DestroyColliders(this, globalCtx);
 }
@@ -235,15 +233,16 @@ void func_80AEAECC(EnRu1* this, GlobalContext* globalCtx) {
     f32 velocityYHeld = *velocityY;
 
     *velocityY = -4.0f;
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 19.0f, 25.0f, 30.0f, 7);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 19.0f, 25.0f, 30.0f,
+                            UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
     *velocityY = velocityYHeld;
 }
 
 s32 EnRu1_IsCsStateIdle(GlobalContext* globalCtx) {
     if (globalCtx->csCtx.state == CS_STATE_IDLE) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 CsCmdActorAction* func_80AEAF58(GlobalContext* globalCtx, s32 npcActionIdx) {
@@ -260,18 +259,18 @@ s32 func_80AEAFA0(GlobalContext* globalCtx, u16 action, s32 npcActionIdx) {
     CsCmdActorAction* csCmdNPCAction = func_80AEAF58(globalCtx, npcActionIdx);
 
     if ((csCmdNPCAction != NULL) && (csCmdNPCAction->action == action)) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 s32 func_80AEAFE0(GlobalContext* globalCtx, u16 action, s32 npcActionIdx) {
     CsCmdActorAction* csCmdNPCAction = func_80AEAF58(globalCtx, npcActionIdx);
 
     if ((csCmdNPCAction != NULL) && (csCmdNPCAction->action != action)) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 s32 func_80AEB020(EnRu1* this, GlobalContext* globalCtx) {
@@ -283,13 +282,13 @@ s32 func_80AEB020(EnRu1* this, GlobalContext* globalCtx) {
             someEnRu1 = (EnRu1*)actorIt;
             if (someEnRu1 != this) {
                 if ((someEnRu1->action == 31) || (someEnRu1->action == 32) || (someEnRu1->action == 24)) {
-                    return 1;
+                    return true;
                 }
             }
         }
         actorIt = actorIt->next;
     }
-    return 0;
+    return false;
 }
 
 BgBdanObjects* EnRu1_FindSwitch(GlobalContext* globalCtx) {
@@ -301,7 +300,7 @@ BgBdanObjects* EnRu1_FindSwitch(GlobalContext* globalCtx) {
         }
         actorIt = actorIt->next;
     }
-    // There is no stand
+    // "There is no stand"
     osSyncPrintf(VT_FGCOL(RED) "お立ち台が無い!!!!!!!!!!!!!!!!!!!!!!!!!\n" VT_RST);
     return NULL;
 }
@@ -333,11 +332,11 @@ Actor* func_80AEB124(GlobalContext* globalCtx) {
 }
 
 s32 func_80AEB174(GlobalContext* globalCtx) {
-    return (func_8010BDBC(&globalCtx->msgCtx) == 5) && (func_80106BC8(globalCtx));
+    return (Message_GetState(&globalCtx->msgCtx) == TEXT_STATE_EVENT) && Message_ShouldAdvance(globalCtx);
 }
 
 s32 func_80AEB1B4(GlobalContext* globalCtx) {
-    return func_8010BDBC(&globalCtx->msgCtx) == 2;
+    return Message_GetState(&globalCtx->msgCtx) == TEXT_STATE_CLOSING;
 }
 
 void func_80AEB1D8(EnRu1* this) {
@@ -358,7 +357,7 @@ void func_80AEB220(EnRu1* this, GlobalContext* globalCtx) {
     }
 }
 
-void func_80AEB264(EnRu1* this, AnimationHeader* animation, u8 arg2, f32 transitionRate, s32 arg4) {
+void func_80AEB264(EnRu1* this, AnimationHeader* animation, u8 arg2, f32 morphFrames, s32 arg4) {
     s32 pad[2];
     AnimationHeader* animHeader = SEGMENTED_TO_VIRTUAL(animation);
     f32 frameCount = Animation_GetLastFrame(animHeader);
@@ -376,10 +375,10 @@ void func_80AEB264(EnRu1* this, AnimationHeader* animation, u8 arg2, f32 transit
         playbackSpeed = -1.0f;
     }
 
-    Animation_Change(&this->skelAnime, animHeader, playbackSpeed, unk0, fc, arg2, transitionRate);
+    Animation_Change(&this->skelAnime, animHeader, playbackSpeed, unk0, fc, arg2, morphFrames);
 }
 
-s32 EnRu1_FrameUpdateMatrix(EnRu1* this) {
+s32 EnRu1_UpdateSkelAnime(EnRu1* this) {
     // why?
     if (this->action != 32) {
         return SkelAnime_Update(&this->skelAnime);
@@ -482,6 +481,7 @@ void func_80AEB7D0(EnRu1* this) {
 
 f32 func_80AEB7E0(CsCmdActorAction* csCmdNPCAction, GlobalContext* globalCtx) {
     s32 csCtxFrames = globalCtx->csCtx.frames;
+
     if ((csCtxFrames < csCmdNPCAction->endFrame) && (csCmdNPCAction->endFrame - csCmdNPCAction->startFrame > 0)) {
         return (Math_CosS(((csCtxFrames - csCmdNPCAction->startFrame) /
                            (f32)(csCmdNPCAction->endFrame - csCmdNPCAction->startFrame)) *
@@ -548,6 +548,7 @@ void func_80AEBA2C(EnRu1* this, GlobalContext* globalCtx) {
     f32 temp_ret_2;
     CsCmdActorAction* csCmdNPCAction = func_80AEB438(globalCtx);
     s32 pad2;
+
     if (csCmdNPCAction != NULL) {
         temp_ret_2 = func_80AEB7E0(csCmdNPCAction, globalCtx);
         thisPos = &this->actor.world.pos;
@@ -573,9 +574,8 @@ void func_80AEBB3C(EnRu1* this) {
 void func_80AEBB78(EnRu1* this) {
     SkelAnime* skelAnime = &this->skelAnime;
 
-    if ((((Animation_OnFrame(skelAnime, 4.0f)) || (Animation_OnFrame(skelAnime, 13.0f))) ||
-         (Animation_OnFrame(skelAnime, 22.0f))) ||
-        (Animation_OnFrame(skelAnime, 31.0f))) {
+    if (Animation_OnFrame(skelAnime, 4.0f) || Animation_OnFrame(skelAnime, 13.0f) ||
+        Animation_OnFrame(skelAnime, 22.0f) || Animation_OnFrame(skelAnime, 31.0f)) {
         func_80078914(&this->actor.projectedPos, NA_SE_PL_SWIM);
     }
 }
@@ -590,9 +590,9 @@ void func_80AEBC30(GlobalContext* globalCtx) {
     Player* player;
 
     if (globalCtx->csCtx.frames == 0xCD) {
-        player = PLAYER;
-        Audio_PlaySoundGeneral(NA_SE_EV_DIVE_INTO_WATER, &player->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                               &D_801333E8);
+        player = GET_PLAYER(globalCtx);
+        Audio_PlaySoundGeneral(NA_SE_EV_DIVE_INTO_WATER, &player->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     }
 }
 
@@ -666,7 +666,6 @@ void func_80AEBF60(EnRu1* this, GlobalContext* globalCtx) {
         func_80AEB7D0(this);
         this->action = 5;
         this->unk_364 = this->actor.world.pos;
-        return;
     } else {
         func_80AEBA0C(this, globalCtx);
     }
@@ -698,7 +697,7 @@ void func_80AEC070(EnRu1* this, GlobalContext* globalCtx, UNK_TYPE arg2) {
 
 void func_80AEC0B4(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEB89C(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEBC84(this, globalCtx);
     func_80AEBC30(globalCtx);
     func_80AEBD1C(this, globalCtx);
@@ -710,7 +709,7 @@ void func_80AEC100(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEC130(EnRu1* this, GlobalContext* globalCtx) {
-    s32 something = EnRu1_FrameUpdateMatrix(this);
+    s32 something = EnRu1_UpdateSkelAnime(this);
 
     func_80AEAECC(this, globalCtx);
     func_80AEBB3C(this);
@@ -720,7 +719,7 @@ void func_80AEC130(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEC17C(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEB974(this, globalCtx);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEB50C(this, globalCtx);
     func_80AEBEC8(this, globalCtx);
 }
@@ -728,7 +727,7 @@ void func_80AEC17C(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEC1D4(EnRu1* this, GlobalContext* globalCtx) {
     s32 something;
 
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     func_80AEAECC(this, globalCtx);
     EnRu1_UpdateEyes(this);
     func_80AEB50C(this, globalCtx);
@@ -740,7 +739,7 @@ void func_80AEC1D4(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEC244(EnRu1* this, GlobalContext* globalCtx) {
     s32 something;
 
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     func_80AEBA2C(this, globalCtx);
     func_80AEAECC(this, globalCtx);
     EnRu1_UpdateEyes(this);
@@ -753,7 +752,7 @@ void func_80AEC244(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEC2C0(EnRu1* this, GlobalContext* globalCtx) {
     s32 something;
 
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     func_80AEAECC(this, globalCtx);
     EnRu1_UpdateEyes(this);
     func_80AEB50C(this, globalCtx);
@@ -763,14 +762,11 @@ void func_80AEC2C0(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEC320(EnRu1* this, GlobalContext* globalCtx) {
     s8 actorRoom;
 
-    if (!(gSaveContext.infTable[20] & 2)) {
+    if (!GET_INFTABLE(INFTABLE_141)) {
         func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
         this->action = 7;
         EnRu1_SetMouthIndex(this, 1);
-        return;
-    }
-    if ((gSaveContext.infTable[20] & 0x80) && (!(gSaveContext.infTable[20] & 1)) &&
-        (!(gSaveContext.infTable[20] & 0x20))) {
+    } else if (GET_INFTABLE(INFTABLE_147) && !GET_INFTABLE(INFTABLE_140) && !GET_INFTABLE(INFTABLE_145)) {
         if (!func_80AEB020(this, globalCtx)) {
             func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
             actorRoom = this->actor.room;
@@ -821,20 +817,21 @@ void func_80AEC4F4(EnRu1* this) {
 }
 
 s32 func_80AEC5FC(EnRu1* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     f32 thisPosZ = this->actor.world.pos.z;
     f32 playerPosZ = player->actor.world.pos.z;
 
     if ((playerPosZ - thisPosZ <= 265.0f) && (player->actor.world.pos.y >= this->actor.world.pos.y)) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 void func_80AEC650(EnRu1* this) {
     s32 pad[2];
+
     if (this->unk_280 == 0) {
-        if ((Animation_OnFrame(&this->skelAnime, 2.0f)) || (Animation_OnFrame(&this->skelAnime, 7.0f))) {
+        if (Animation_OnFrame(&this->skelAnime, 2.0f) || Animation_OnFrame(&this->skelAnime, 7.0f)) {
             func_80078914(&this->actor.projectedPos, NA_SE_PL_WALK_DIRT);
         }
     }
@@ -856,10 +853,11 @@ void func_80AEC6E4(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEC780(EnRu1* this, GlobalContext* globalCtx) {
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
-    if ((func_80AEC5FC(this, globalCtx)) && (!Gameplay_InCsMode(globalCtx)) && (!(player->stateFlags1 & 0x206000)) &&
-        (player->actor.bgCheckFlags & 1)) {
+    if ((func_80AEC5FC(this, globalCtx)) && (!Gameplay_InCsMode(globalCtx)) &&
+        (!(player->stateFlags1 & (PLAYER_STATE1_13 | PLAYER_STATE1_14 | PLAYER_STATE1_21))) &&
+        (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
 
         globalCtx->csCtx.segment = &D_80AF0880;
         gSaveContext.cutsceneTrigger = 1;
@@ -913,7 +911,7 @@ void func_80AEC9C4(EnRu1* this) {
 }
 
 void func_80AECA18(EnRu1* this) {
-    if (!(this->actor.bgCheckFlags & 1)) {
+    if (!(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
         this->action = 13;
         this->unk_26C = 0.0f;
         this->actor.velocity.y = 0.0f;
@@ -922,7 +920,7 @@ void func_80AECA18(EnRu1* this) {
 
 void func_80AECA44(EnRu1* this, GlobalContext* globalCtx) {
     if (func_80AEAFA0(globalCtx, 5, 3)) {
-        gSaveContext.infTable[20] |= 2;
+        SET_INFTABLE(INFTABLE_141);
         this->action = 14;
     }
 }
@@ -936,7 +934,7 @@ void func_80AECAB4(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AECAD4(EnRu1* this, GlobalContext* globalCtx) {
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEC8B8(this, globalCtx);
@@ -945,7 +943,7 @@ void func_80AECAD4(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AECB18(EnRu1* this, GlobalContext* globalCtx) {
     s32 something;
 
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEC93C(this, something);
@@ -953,7 +951,7 @@ void func_80AECB18(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AECB60(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEC40C(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEC650(this);
@@ -963,7 +961,7 @@ void func_80AECB60(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AECBB8(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEC4CC(this);
     func_80AEC6E4(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEC650(this);
@@ -973,7 +971,7 @@ void func_80AECBB8(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AECC1C(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEC4F4(this);
     func_80AEC6E4(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEC650(this);
@@ -1001,7 +999,7 @@ void func_80AECCB0(EnRu1* this, GlobalContext* globalCtx) {
     spawnY = pos->y;
     spawnZ = ((kREG(1) + 12.0f) * Math_CosS(yawTowardsPlayer)) + pos->z;
     this->blueWarp = (DoorWarp1*)Actor_SpawnAsChild(&globalCtx->actorCtx, &this->actor, globalCtx, ACTOR_DOOR_WARP1,
-                                                    spawnX, spawnY, spawnZ, 0, yawTowardsPlayer, 0, 5);
+                                                    spawnX, spawnY, spawnZ, 0, yawTowardsPlayer, 0, WARP_BLUE_RUTO);
 }
 
 void func_80AECDA0(EnRu1* this, GlobalContext* globalCtx) {
@@ -1018,7 +1016,7 @@ void func_80AECE04(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AECE20(EnRu1* this, GlobalContext* globalCtx) {
     s32 pad2;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Vec3f* playerPos = &player->actor.world.pos;
     s16 shapeRotY = player->actor.shape.rot.y;
     s32 pad;
@@ -1032,7 +1030,7 @@ void func_80AECE20(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AECEB4(EnRu1* this, GlobalContext* globalCtx) {
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Vec3f* player_unk_450 = &player->unk_450;
     Vec3f* pos = &this->actor.world.pos;
     s16 shapeRotY = this->actor.shape.rot.y;
@@ -1043,7 +1041,7 @@ void func_80AECEB4(EnRu1* this, GlobalContext* globalCtx) {
 
 s32 func_80AECF6C(EnRu1* this, GlobalContext* globalCtx) {
     s16* shapeRotY;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Player* otherPlayer;
     s16 temp_f16;
     f32 temp1;
@@ -1052,34 +1050,34 @@ s32 func_80AECF6C(EnRu1* this, GlobalContext* globalCtx) {
 
     this->unk_26C += 1.0f;
     if ((player->actor.speedXZ == 0.0f) && (this->unk_26C >= 3.0f)) {
-        otherPlayer = PLAYER;
+        otherPlayer = GET_PLAYER(globalCtx);
         player->actor.world.pos.x = otherPlayer->unk_450.x;
         player->actor.world.pos.y = otherPlayer->unk_450.y;
         player->actor.world.pos.z = otherPlayer->unk_450.z;
         shapeRotY = &player->actor.shape.rot.y;
         temp1 = this->actor.world.pos.x - player->actor.world.pos.x;
         temp2 = this->actor.world.pos.z - player->actor.world.pos.z;
-        temp_f16 = Math_FAtan2F(temp1, temp2) * (0x8000 / M_PI);
+        temp_f16 = RAD_TO_BINANG(Math_FAtan2F(temp1, temp2));
         if (*shapeRotY != temp_f16) {
             Math_SmoothStepToS(shapeRotY, temp_f16, 0x14, 0x1838, 0x64);
             player->actor.world.rot.y = *shapeRotY;
         } else {
-            return 1;
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
-s32 func_80AED084(EnRu1* this, UNK_TYPE arg1) {
-    if (this->blueWarp != NULL && this->blueWarp->unk_1EC == arg1) {
-        return 1;
+s32 func_80AED084(EnRu1* this, s32 state) {
+    if (this->blueWarp != NULL && this->blueWarp->rutoWarpState == state) {
+        return true;
     }
-    return 0;
+    return false;
 }
 
-void func_80AED0B0(EnRu1* this, UNK_TYPE arg1) {
+void func_80AED0B0(EnRu1* this, s32 state) {
     if (this->blueWarp != NULL) {
-        this->blueWarp->unk_1EC = arg1;
+        this->blueWarp->rutoWarpState = state;
     }
 }
 
@@ -1099,12 +1097,12 @@ void func_80AED110(EnRu1* this) {
     if (this->actor.shape.yOffset >= 0.0f) {
         this->action = 18;
         this->actor.shape.yOffset = 0.0f;
-        func_80AED0B0(this, 1);
+        func_80AED0B0(this, WARP_BLUE_RUTO_STATE_READY);
     }
 }
 
 void func_80AED154(EnRu1* this, GlobalContext* globalCtx) {
-    if (func_80AED084(this, 2)) {
+    if (func_80AED084(this, WARP_BLUE_RUTO_STATE_ENTERED)) {
         this->action = 0x13;
         this->unk_26C = 0.0f;
         func_80AECEB4(this, globalCtx);
@@ -1117,17 +1115,17 @@ void func_80AED19C(EnRu1* this, s32 cond) {
                          Animation_GetLastFrame(&gRutoChildTransitionHandsOnHipToCrossArmsAndLegsAnim), ANIMMODE_ONCE,
                          -8.0f);
         this->action = 20;
-        func_80AED0B0(this, 3);
+        func_80AED0B0(this, WARP_BLUE_RUTO_STATE_3);
     }
 }
 
 void func_80AED218(EnRu1* this, UNK_TYPE arg1) {
-    if (func_80AED084(this, 4)) {
+    if (func_80AED084(this, WARP_BLUE_RUTO_STATE_TALKING)) {
         if (arg1 != 0) {
             Animation_Change(&this->skelAnime, &gRutoChildWaitSittingAnim, 1.0f, 0,
                              Animation_GetLastFrame(&gRutoChildWaitSittingAnim), ANIMMODE_LOOP, -8.0f);
         }
-    } else if (func_80AED084(this, 5)) {
+    } else if (func_80AED084(this, WARP_BLUE_RUTO_STATE_WARPING)) {
         Animation_Change(&this->skelAnime, &gRutoChildWaitInBlueWarpAnim, 1.0f, 0,
                          Animation_GetLastFrame(&gRutoChildWaitInBlueWarpAnim), ANIMMODE_ONCE, -8.0f);
         this->action = 21;
@@ -1145,36 +1143,36 @@ void func_80AED324(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AED344(EnRu1* this, GlobalContext* globalCtx) {
     func_80AECE04(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AED110(this);
 }
 
 void func_80AED374(EnRu1* this, GlobalContext* globalCtx) {
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AED154(this, globalCtx);
 }
 
 void func_80AED3A4(EnRu1* this, GlobalContext* globalCtx) {
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AED19C(this, func_80AECF6C(this, globalCtx));
 }
 
 void func_80AED3E0(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEAECC(this, globalCtx);
-    func_80AED218(this, EnRu1_FrameUpdateMatrix(this));
+    func_80AED218(this, EnRu1_UpdateSkelAnime(this));
 }
 
 void func_80AED414(EnRu1* this, GlobalContext* globalCtx) {
     func_80AECE20(this, globalCtx);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
 }
 
 void func_80AED44C(EnRu1* this, GlobalContext* globalCtx) {
     s8 actorRoom;
 
-    if ((gSaveContext.infTable[20] & 2) && (!(gSaveContext.infTable[20] & 0x20)) &&
-        (!(gSaveContext.infTable[20] & 1)) && (!(gSaveContext.infTable[20] & 0x80))) {
+    if (GET_INFTABLE(INFTABLE_141) && !GET_INFTABLE(INFTABLE_145) && !GET_INFTABLE(INFTABLE_140) &&
+        !GET_INFTABLE(INFTABLE_147)) {
         if (!func_80AEB020(this, globalCtx)) {
             func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
             actorRoom = this->actor.room;
@@ -1196,10 +1194,10 @@ void func_80AED4FC(EnRu1* this) {
 }
 
 void func_80AED520(EnRu1* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
-    Audio_PlaySoundGeneral(NA_SE_PL_PULL_UP_RUTO, &player->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                           &D_801333E8);
+    Audio_PlaySoundGeneral(NA_SE_PL_PULL_UP_RUTO, &player->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     func_80078914(&this->actor.projectedPos, NA_SE_VO_RT_LIFT);
 }
 
@@ -1226,7 +1224,7 @@ s32 func_80AED624(EnRu1* this, GlobalContext* globalCtx) {
 
     if (this->roomNum2 != curRoomNum) {
         Actor_Kill(&this->actor);
-        return 0;
+        return false;
     } else if (((this->roomNum1 != curRoomNum) || (this->roomNum2 != curRoomNum)) &&
                (this->actor.yDistToWater > kREG(16) + 50.0f) && (this->action != 33)) {
         this->action = 33;
@@ -1234,7 +1232,7 @@ s32 func_80AED624(EnRu1* this, GlobalContext* globalCtx) {
         this->alpha = 0xFF;
         this->unk_2A4 = 0.0f;
     }
-    return 1;
+    return true;
 }
 
 void func_80AED6DC(EnRu1* this, GlobalContext* globalCtx) {
@@ -1247,10 +1245,10 @@ void func_80AED6DC(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AED6F8(GlobalContext* globalCtx) {
     s8 curRoomNum;
 
-    if ((!(gSaveContext.infTable[20] & 0x80))) {
+    if (!GET_INFTABLE(INFTABLE_147)) {
         curRoomNum = globalCtx->roomCtx.curRoom.num;
         if (curRoomNum == 2) {
-            gSaveContext.infTable[20] |= 0x80;
+            SET_INFTABLE(INFTABLE_147);
         }
     }
 }
@@ -1271,7 +1269,7 @@ void func_80AED738(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AED83C(EnRu1* this) {
-    s32 pad2[2];
+    s32 pad[2];
     Vec3s* tempPtr;
     Vec3s* tempPtr2;
 
@@ -1319,7 +1317,7 @@ void func_80AEDAE0(EnRu1* this, GlobalContext* globalCtx) {
     DynaPolyActor* dynaPolyActor = DynaPoly_GetActor(&globalCtx->colCtx, this->actor.floorBgId);
 
     if (dynaPolyActor == NULL || dynaPolyActor->actor.id == ACTOR_EN_BOX) {
-        this->actor.bgCheckFlags &= ~0x19;
+        this->actor.bgCheckFlags &= ~(BGCHECKFLAG_GROUND | BGCHECKFLAG_WALL | BGCHECKFLAG_CEILING);
     }
 }
 
@@ -1334,7 +1332,7 @@ void func_80AEDB30(EnRu1* this, GlobalContext* globalCtx) {
     s32 temp_a0;
     s32 phi_v1;
 
-    if (this->actor.bgCheckFlags & 1) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
         velocityY = &this->actor.velocity.y;
         dynaPolyActor = DynaPoly_GetActor(&globalCtx->colCtx, this->actor.floorBgId);
         if (*velocityY <= 0.0f) {
@@ -1370,7 +1368,7 @@ void func_80AEDB30(EnRu1* this, GlobalContext* globalCtx) {
             func_80AED4FC(this);
         }
     }
-    if (this->actor.bgCheckFlags & 0x10) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_CEILING) {
         speedXZ = &this->actor.speedXZ;
         velocityY = &this->actor.velocity.y;
         if (*speedXZ >= (kREG(27) * 0.01f) + 3.0f) {
@@ -1383,7 +1381,7 @@ void func_80AEDB30(EnRu1* this, GlobalContext* globalCtx) {
             func_80AED4FC(this);
         }
     }
-    if (this->actor.bgCheckFlags & 8) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_WALL) {
         speedXZ = &this->actor.speedXZ;
         if (*speedXZ != 0.0f) {
             rotY = this->actor.world.rot.y;
@@ -1496,37 +1494,38 @@ void func_80AEE050(EnRu1* this) {
 }
 
 s32 func_80AEE264(EnRu1* this, GlobalContext* globalCtx) {
-    if (!func_8002F194(&this->actor, globalCtx)) {
-        this->actor.flags |= 9;
-        if ((gSaveContext.infTable[20] & 8)) {
+    if (!Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
+        this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_3;
+        if (GET_INFTABLE(INFTABLE_143)) {
             this->actor.textId = 0x404E;
             func_8002F2F4(&this->actor, globalCtx);
-        } else if (gSaveContext.infTable[20] & 4) {
+        } else if (GET_INFTABLE(INFTABLE_142)) {
             this->actor.textId = 0x404D;
             func_8002F2F4(&this->actor, globalCtx);
         } else {
             this->actor.textId = 0x404C;
             func_8002F2F4(&this->actor, globalCtx);
         }
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 void func_80AEE2F8(EnRu1* this, GlobalContext* globalCtx) {
     DynaPolyActor* dynaPolyActor;
     s32 floorBgId;
-    if ((this->actor.bgCheckFlags & 1) && (this->actor.floorBgId != BGCHECK_SCENE)) {
+
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && (this->actor.floorBgId != BGCHECK_SCENE)) {
         floorBgId = this->actor.floorBgId;
         dynaPolyActor = DynaPoly_GetActor(&globalCtx->colCtx, floorBgId);
         if ((dynaPolyActor != NULL) && (dynaPolyActor->actor.id == ACTOR_BG_BDAN_SWITCH)) {
             if (((dynaPolyActor->actor.params >> 8) & 0x3F) == 0x38) {
-                gSaveContext.infTable[20] |= 1;
+                SET_INFTABLE(INFTABLE_140);
                 return;
             }
         }
     }
-    gSaveContext.infTable[20] &= ~0x1;
+    CLEAR_INFTABLE(INFTABLE_140);
 }
 
 s32 func_80AEE394(EnRu1* this, GlobalContext* globalCtx) {
@@ -1535,12 +1534,12 @@ s32 func_80AEE394(EnRu1* this, GlobalContext* globalCtx) {
     DynaPolyActor* dynaPolyActor;
     s32 floorBgId;
 
-    if ((this->actor.bgCheckFlags & 1) && this->actor.floorBgId != BGCHECK_SCENE) {
+    if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && this->actor.floorBgId != BGCHECK_SCENE) {
         colCtx = &globalCtx->colCtx;
         floorBgId = this->actor.floorBgId; // necessary match, can't move this out of this block unfortunately
         dynaPolyActor = DynaPoly_GetActor(colCtx, floorBgId);
         if (dynaPolyActor != NULL && dynaPolyActor->actor.id == ACTOR_BG_BDAN_OBJECTS &&
-            dynaPolyActor->actor.params == 0 && !Player_InCsMode(globalCtx) && globalCtx->msgCtx.unk_E300 == 0) {
+            dynaPolyActor->actor.params == 0 && !Player_InCsMode(globalCtx) && globalCtx->msgCtx.msgLength == 0) {
             func_80AEE02C(this);
             globalCtx->csCtx.segment = &D_80AF10A4;
             gSaveContext.cutsceneTrigger = 1;
@@ -1548,10 +1547,10 @@ s32 func_80AEE394(EnRu1* this, GlobalContext* globalCtx) {
             this->drawConfig = 0;
             this->unk_28C = (BgBdanObjects*)dynaPolyActor;
             this->actor.shape.shadowAlpha = 0;
-            return 1;
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
 void func_80AEE488(EnRu1* this, GlobalContext* globalCtx) {
@@ -1562,7 +1561,7 @@ void func_80AEE488(EnRu1* this, GlobalContext* globalCtx) {
         this->roomNum3 = curRoomNum;
         this->action = 31;
         func_80AED520(this, globalCtx);
-    } else if ((!func_80AEE394(this, globalCtx)) && (!(this->actor.bgCheckFlags & 1))) {
+    } else if (!func_80AEE394(this, globalCtx) && !(this->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) {
         this->actor.minVelocityY = -((kREG(24) * 0.01f) + 6.8f);
         this->actor.gravity = -((kREG(23) * 0.01f) + 1.3f);
         this->action = 28;
@@ -1571,7 +1570,8 @@ void func_80AEE488(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEE568(EnRu1* this, GlobalContext* globalCtx) {
     if (!func_80AEE394(this, globalCtx)) {
-        if ((this->actor.bgCheckFlags & 1) && (this->actor.speedXZ == 0.0f) && (this->actor.minVelocityY == 0.0f)) {
+        if ((this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) && (this->actor.speedXZ == 0.0f) &&
+            (this->actor.minVelocityY == 0.0f)) {
             func_80AEE02C(this);
             func_8002F580(&this->actor, globalCtx);
             this->action = 27;
@@ -1590,7 +1590,7 @@ void func_80AEE628(EnRu1* this, GlobalContext* globalCtx) {
     if (EnRu1_IsCsStateIdle(globalCtx)) {
         Animation_Change(&this->skelAnime, &gRutoChildSittingAnim, 1.0f, 0,
                          Animation_GetLastFrame(&gRutoChildSittingAnim), ANIMMODE_LOOP, -8.0f);
-        gSaveContext.infTable[20] |= 0x10;
+        SET_INFTABLE(INFTABLE_144);
         this->action = 31;
     }
     this->roomNum3 = curRoomNum;
@@ -1600,7 +1600,7 @@ s32 func_80AEE6D0(EnRu1* this, GlobalContext* globalCtx) {
     s32 pad;
     s8 curRoomNum = globalCtx->roomCtx.curRoom.num;
 
-    if ((!(gSaveContext.infTable[20] & 0x10)) && (func_80AEB124(globalCtx) != 0)) {
+    if (!GET_INFTABLE(INFTABLE_144) && (func_80AEB124(globalCtx) != 0)) {
         if (!Player_InCsMode(globalCtx)) {
             Animation_Change(&this->skelAnime, &gRutoChildSeesSapphireAnim, 1.0f, 0,
                              Animation_GetLastFrame(&gRutoChildSquirmAnim), ANIMMODE_LOOP, -8.0f);
@@ -1611,10 +1611,10 @@ s32 func_80AEE6D0(EnRu1* this, GlobalContext* globalCtx) {
             gSaveContext.cutsceneTrigger = 1;
         }
         this->roomNum3 = curRoomNum;
-        return 1;
+        return true;
     }
     this->roomNum3 = curRoomNum;
-    return 0;
+    return false;
 }
 
 void func_80AEE7C4(EnRu1* this, GlobalContext* globalCtx) {
@@ -1642,8 +1642,8 @@ void func_80AEE7C4(EnRu1* this, GlobalContext* globalCtx) {
         return;
     }
 
-    player = PLAYER;
-    if (player->stateFlags2 & 0x10000000) {
+    player = GET_PLAYER(globalCtx);
+    if (player->stateFlags2 & PLAYER_STATE2_28) {
         this->unk_370 += 1.0f;
         if (this->action != 32) {
             if (*unk_370 > 30.0f) {
@@ -1672,14 +1672,14 @@ void func_80AEE7C4(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 s32 func_80AEEAC8(EnRu1* this, GlobalContext* globalCtx) {
-    if (this->actor.bgCheckFlags & 1) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_GROUND) {
         func_80AEE02C(this);
         func_8002F580(&this->actor, globalCtx);
         this->action = 27;
         func_80AEADD8(this);
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 void func_80AEEB24(EnRu1* this, GlobalContext* globalCtx) {
@@ -1699,7 +1699,7 @@ void func_80AEEBD4(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAC54(this, globalCtx);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEEBB4(this, globalCtx);
     func_80AEE488(this, globalCtx);
@@ -1713,7 +1713,7 @@ void func_80AEEC5C(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEAECC(this, globalCtx);
     func_80AEE2F8(this, globalCtx);
     func_80AEDFF4(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEE568(this, globalCtx);
     func_80AED624(this, globalCtx);
@@ -1724,7 +1724,7 @@ void func_80AEECF0(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
     func_80AEE050(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEEB24(this, globalCtx);
     func_80AED624(this, globalCtx);
@@ -1734,7 +1734,7 @@ void func_80AEED58(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
     Actor_MoveForward(&this->actor);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEEAC8(this, globalCtx);
     func_80AED624(this, globalCtx);
@@ -1743,7 +1743,7 @@ void func_80AEED58(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEEDCC(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED8DC(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEAECC(this, globalCtx);
     func_80AEE2F8(this, globalCtx);
     EnRu1_UpdateEyes(this);
@@ -1753,7 +1753,7 @@ void func_80AEEDCC(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEEE34(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEAECC(this, globalCtx);
     func_80AEE2F8(this, globalCtx);
     EnRu1_UpdateEyes(this);
@@ -1765,7 +1765,7 @@ void func_80AEEE9C(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
     func_80AEDFF4(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AED738(this, globalCtx);
     func_80AED624(this, globalCtx);
@@ -1773,7 +1773,7 @@ void func_80AEEE9C(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEEF08(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEAECC(this, globalCtx);
     EnRu1_UpdateEyes(this);
     func_80AEE628(this, globalCtx);
@@ -1783,7 +1783,7 @@ void func_80AEEF5C(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEEF68(EnRu1* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 something;
 
     this->unk_374.unk_18 = player->actor.world.pos;
@@ -1793,7 +1793,7 @@ void func_80AEEF68(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEEFEC(EnRu1* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 something;
 
     this->unk_374.unk_18 = player->actor.world.pos;
@@ -1812,15 +1812,15 @@ void func_80AEF080(EnRu1* this) {
 s32 func_80AEF0BC(EnRu1* this, GlobalContext* globalCtx) {
     s32 frameCount;
 
-    if (gSaveContext.infTable[20] & 4) {
+    if (GET_INFTABLE(INFTABLE_142)) {
         frameCount = Animation_GetLastFrame(&gRutoChildSitAnim);
         Animation_Change(&this->skelAnime, &gRutoChildSitAnim, 1.0f, 0, frameCount, ANIMMODE_ONCE, -8.0f);
-        globalCtx->msgCtx.msgMode = 0x37;
+        globalCtx->msgCtx.msgMode = MSGMODE_PAUSED;
         this->action = 26;
-        this->actor.flags &= ~0x9;
-        return 1;
+        this->actor.flags &= ~(ACTOR_FLAG_0 | ACTOR_FLAG_3);
+        return true;
     }
-    return 0;
+    return false;
 }
 
 void func_80AEF170(EnRu1* this, GlobalContext* globalCtx, s32 cond) {
@@ -1831,8 +1831,8 @@ void func_80AEF170(EnRu1* this, GlobalContext* globalCtx, s32 cond) {
 
 void func_80AEF188(EnRu1* this, GlobalContext* globalCtx) {
     if (func_80AEB174(globalCtx) && !func_80AEF0BC(this, globalCtx)) {
-        func_80106CCC(globalCtx);
-        gSaveContext.infTable[20] |= 4;
+        Message_CloseTextbox(globalCtx);
+        SET_INFTABLE(INFTABLE_142);
         this->action = 24;
     }
 }
@@ -1841,8 +1841,8 @@ void func_80AEF1F0(EnRu1* this, GlobalContext* globalCtx, UNK_TYPE arg2) {
     if (arg2 != 0) {
         Animation_Change(&this->skelAnime, &gRutoChildSittingAnim, 1.0f, 0.0f,
                          Animation_GetLastFrame(&gRutoChildSittingAnim), ANIMMODE_LOOP, 0.0f);
-        func_80106CCC(globalCtx);
-        gSaveContext.infTable[20] |= 8;
+        Message_CloseTextbox(globalCtx);
+        SET_INFTABLE(INFTABLE_143);
         func_80AED6DC(this, globalCtx);
         func_8002F580(&this->actor, globalCtx);
         this->action = 27;
@@ -1857,14 +1857,14 @@ void func_80AEF29C(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEF2AC(EnRu1* this, GlobalContext* globalCtx) {
     this->action = 24;
     this->drawConfig = 1;
-    this->actor.flags |= 9;
+    this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_3;
 }
 
 void func_80AEF2D0(EnRu1* this, GlobalContext* globalCtx) {
     s32 cond;
 
     func_80AEEF68(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAC10(this, globalCtx);
     func_80AEAECC(this, globalCtx);
@@ -1875,7 +1875,7 @@ void func_80AEF2D0(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEF354(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEEFEC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEF188(this, globalCtx);
@@ -1885,7 +1885,7 @@ void func_80AEF3A8(EnRu1* this, GlobalContext* globalCtx) {
     s32 something;
 
     func_80AED83C(this);
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     func_80AEF080(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
@@ -1895,15 +1895,15 @@ void func_80AEF3A8(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEF40C(EnRu1* this) {
     SkelAnime* skelAnime = &this->skelAnime;
 
-    if ((Animation_OnFrame(skelAnime, 2.0f)) || (Animation_OnFrame(skelAnime, 7.0f)) ||
-        (Animation_OnFrame(skelAnime, 12.0f)) || (Animation_OnFrame(skelAnime, 18.0f)) ||
-        (Animation_OnFrame(skelAnime, 25.0f)) || (Animation_OnFrame(skelAnime, 33.0f))) {
+    if (Animation_OnFrame(skelAnime, 2.0f) || Animation_OnFrame(skelAnime, 7.0f) ||
+        Animation_OnFrame(skelAnime, 12.0f) || Animation_OnFrame(skelAnime, 18.0f) ||
+        Animation_OnFrame(skelAnime, 25.0f) || Animation_OnFrame(skelAnime, 33.0f)) {
         func_80078914(&this->actor.projectedPos, NA_SE_PL_WALK_DIRT);
     }
 }
 
 void func_80AEF4A8(EnRu1* this, GlobalContext* globalCtx) {
-    Audio_PlaySoundAtPosition(globalCtx, &this->actor.projectedPos, 20, NA_SE_VO_RT_FALL);
+    SoundSource_PlaySfxAtFixedWorldPos(globalCtx, &this->actor.projectedPos, 20, NA_SE_VO_RT_FALL);
 }
 
 void func_80AEF4E0(EnRu1* this) {
@@ -2004,7 +2004,7 @@ void func_80AEF890(EnRu1* this, GlobalContext* globalCtx) {
 
     if ((gSaveContext.sceneSetupIndex < 4) && (EnRu1_IsCsStateIdle(globalCtx))) {
         curRoomNum = globalCtx->roomCtx.curRoom.num;
-        gSaveContext.infTable[20] |= 0x20;
+        SET_INFTABLE(INFTABLE_145);
         Flags_SetSwitch(globalCtx, func_80AEADE0(this));
         func_80AEB0EC(this, 1);
         this->action = 42;
@@ -2014,9 +2014,9 @@ void func_80AEF890(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEF930(EnRu1* this, GlobalContext* globalCtx) {
     if (func_80AEB104(this) == 3) {
-        this->actor.flags |= 9;
+        this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_3;
         this->actor.textId = 0x4048;
-        func_8010B720(globalCtx, this->actor.textId);
+        Message_ContinueTextbox(globalCtx, this->actor.textId);
         func_80AEF4A8(this, globalCtx);
         this->action = 43;
         this->drawConfig = 0;
@@ -2032,7 +2032,7 @@ void func_80AEF99C(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEF9D8(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEF624(this, globalCtx);
     func_80AEB220(this, globalCtx);
@@ -2044,7 +2044,7 @@ void func_80AEFA2C(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEB364(this, globalCtx);
     func_80AEAECC(this, globalCtx);
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     func_80AEF4E0(this);
     func_80AEF5B8(this);
     func_80AEF40C(this);
@@ -2055,7 +2055,7 @@ void func_80AEFA2C(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEFAAC(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     func_80AEF79C(this, globalCtx);
     func_80AEB220(this, globalCtx);
 }
@@ -2065,7 +2065,7 @@ void func_80AEFB04(EnRu1* this, GlobalContext* globalCtx) {
 
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
-    something = EnRu1_FrameUpdateMatrix(this);
+    something = EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEF820(this, something);
     func_80AEB220(this, globalCtx);
@@ -2074,7 +2074,7 @@ void func_80AEFB04(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEFB68(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEF890(this, globalCtx);
     func_80AEB220(this, globalCtx);
@@ -2083,7 +2083,7 @@ void func_80AEFB68(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEFBC8(EnRu1* this, GlobalContext* globalCtx) {
     func_80AED83C(this);
     func_80AEAECC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEF540(this);
     func_80AEF930(this, globalCtx);
@@ -2095,12 +2095,12 @@ void func_80AEFC24(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEFC54(EnRu1* this, GlobalContext* globalCtx) {
-    if ((gSaveContext.infTable[20] & 0x20) && (!(gSaveContext.infTable[20] & 0x40))) {
+    if (GET_INFTABLE(INFTABLE_145) && !GET_INFTABLE(INFTABLE_146)) {
         func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
         this->action = 41;
         this->unk_28C = EnRu1_FindSwitch(globalCtx);
         func_80AEB0EC(this, 1);
-        this->actor.flags &= ~0x9;
+        this->actor.flags &= ~(ACTOR_FLAG_0 | ACTOR_FLAG_3);
     } else {
         Actor_Kill(&this->actor);
     }
@@ -2116,9 +2116,9 @@ void func_80AEFCE8(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void func_80AEFD38(EnRu1* this, GlobalContext* globalCtx) {
-    if ((gSaveContext.eventChkInf[3] & 0x80) && (gSaveContext.linkAge == 1)) {
+    if (GET_EVENTCHKINF(EVENTCHKINF_37) && LINK_IS_CHILD) {
         func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
-        this->actor.flags &= ~0x10;
+        this->actor.flags &= ~ACTOR_FLAG_4;
         this->action = 44;
         this->drawConfig = 1;
     } else {
@@ -2127,24 +2127,24 @@ void func_80AEFD38(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 s32 func_80AEFDC0(EnRu1* this, GlobalContext* globalCtx) {
-    if (!func_8002F194(&this->actor, globalCtx)) {
-        this->actor.flags |= 9;
+    if (!Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
+        this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_3;
         this->actor.textId = Text_GetFaceReaction(globalCtx, 0x1F);
         if (this->actor.textId == 0) {
             this->actor.textId = 0x402C;
         }
         func_8002F2F4(&this->actor, globalCtx);
-        return 0;
+        return false;
     }
-    return 1;
+    return true;
 }
 
 s32 func_80AEFE38(EnRu1* this, GlobalContext* globalCtx) {
-    if (func_8010BDBC(&globalCtx->msgCtx) == 2) {
-        this->actor.flags &= ~0x9;
-        return 1;
+    if (Message_GetState(&globalCtx->msgCtx) == TEXT_STATE_CLOSING) {
+        this->actor.flags &= ~(ACTOR_FLAG_0 | ACTOR_FLAG_3);
+        return true;
     }
-    return 0;
+    return false;
 }
 
 void func_80AEFE84(EnRu1* this, GlobalContext* globalCtx, s32 cond) {
@@ -2161,7 +2161,7 @@ void func_80AEFE9C(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEFECC(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEEF68(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAC10(this, globalCtx);
     func_80AEAECC(this, globalCtx);
@@ -2170,7 +2170,7 @@ void func_80AEFECC(EnRu1* this, GlobalContext* globalCtx) {
 
 void func_80AEFF40(EnRu1* this, GlobalContext* globalCtx) {
     func_80AEEFEC(this, globalCtx);
-    EnRu1_FrameUpdateMatrix(this);
+    EnRu1_UpdateSkelAnime(this);
     EnRu1_UpdateEyes(this);
     func_80AEAECC(this, globalCtx);
     func_80AEFE9C(this, globalCtx);
@@ -2179,7 +2179,7 @@ void func_80AEFF40(EnRu1* this, GlobalContext* globalCtx) {
 void func_80AEFF94(EnRu1* this, GlobalContext* globalCtx) {
     s8 actorRoom;
 
-    if ((gSaveContext.infTable[20] & 2) && (gSaveContext.infTable[20] & 1) && (!(gSaveContext.infTable[20] & 0x20)) &&
+    if (GET_INFTABLE(INFTABLE_141) && GET_INFTABLE(INFTABLE_140) && !GET_INFTABLE(INFTABLE_145) &&
         (!(func_80AEB020(this, globalCtx)))) {
         func_80AEB264(this, &gRutoChildWait2Anim, 0, 0, 0);
         actorRoom = this->actor.room;
@@ -2189,10 +2189,10 @@ void func_80AEFF94(EnRu1* this, GlobalContext* globalCtx) {
         this->roomNum1 = actorRoom;
         this->roomNum3 = actorRoom;
         this->roomNum2 = actorRoom;
-        // Ruto switch set
+        // "Ruto switch set"
         osSyncPrintf("スイッチルトセット!!!!!!!!!!!!!!!!!!!!!!\n");
     } else {
-        // Ruto switch not set
+        // "Ruto switch not set"
         osSyncPrintf("スイッチルトセットしない!!!!!!!!!!!!!!!!!!!!!!\n");
         Actor_Kill(&this->actor);
     }
@@ -2207,10 +2207,10 @@ void func_80AF0050(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void EnRu1_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     if (this->action < 0 || this->action >= ARRAY_COUNT(sActionFuncs) || sActionFuncs[this->action] == NULL) {
-        // Main mode is improper!
+        // "Main mode is improper!"
         osSyncPrintf(VT_FGCOL(RED) "メインモードがおかしい!!!!!!!!!!!!!!!!!!!!!!!!!\n" VT_RST);
         return;
     }
@@ -2220,7 +2220,7 @@ void EnRu1_Update(Actor* thisx, GlobalContext* globalCtx) {
 
 void EnRu1_Init(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 30.0f);
     SkelAnime_InitFlex(globalCtx, &this->skelAnime, &gRutoChildSkel, NULL, this->jointTable, this->morphTable, 17);
@@ -2252,7 +2252,7 @@ void EnRu1_Init(Actor* thisx, GlobalContext* globalCtx) {
             break;
         default:
             Actor_Kill(&this->actor);
-            // Relevant arge_data = %d unacceptable
+            // "Relevant arge_data = %d unacceptable"
             osSyncPrintf("該当 arge_data = %d 無し\n", func_80AEADF0(this));
             break;
     }
@@ -2276,10 +2276,10 @@ void func_80AF0278(EnRu1* this, GlobalContext* globalCtx, s32 limbIndex, Vec3s* 
 
 s32 EnRu1_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx,
                            Gfx** gfx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     if ((this->unk_290 < 0) || (this->unk_290 > 0) || (*sPreLimbDrawFuncs[this->unk_290] == NULL)) {
-        // Neck rotation mode is improper!
+        // "Neck rotation mode is improper!"
         osSyncPrintf(VT_FGCOL(RED) "首回しモードがおかしい!!!!!!!!!!!!!!!!!!!!!!!!!\n" VT_RST);
     } else {
         sPreLimbDrawFuncs[this->unk_290](this, globalCtx, limbIndex, rot);
@@ -2288,7 +2288,7 @@ s32 EnRu1_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList,
 }
 
 void EnRu1_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx, Gfx** gfx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
     Vec3f vec1;
     Vec3f vec2;
 
@@ -2358,10 +2358,10 @@ void EnRu1_DrawXlu(EnRu1* this, GlobalContext* globalCtx) {
 }
 
 void EnRu1_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    EnRu1* this = THIS;
+    EnRu1* this = (EnRu1*)thisx;
 
     if (this->drawConfig < 0 || this->drawConfig >= ARRAY_COUNT(sDrawFuncs) || sDrawFuncs[this->drawConfig] == 0) {
-        // Draw mode is improper!
+        // "Draw mode is improper!"
         osSyncPrintf(VT_FGCOL(RED) "描画モードがおかしい!!!!!!!!!!!!!!!!!!!!!!!!!\n" VT_RST);
         return;
     }

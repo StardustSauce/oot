@@ -11,9 +11,7 @@
 #include "overlays/actors/ovl_En_fHG/z_en_fhg.h"
 #include "overlays/effects/ovl_Effect_Ss_Fhg_Flash/z_eff_ss_fhg_flash.h"
 
-#define FLAGS 0x00000030
-
-#define THIS ((EnFhgFire*)thisx)
+#define FLAGS (ACTOR_FLAG_4 | ACTOR_FLAG_5)
 
 typedef enum {
     /*  0 */ STRIKE_INIT,
@@ -84,8 +82,8 @@ void EnFhgFire_SetUpdate(EnFhgFire* this, EnFhgFireUpdateFunc updateFunc) {
 
 void EnFhgFire_Init(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnFhgFire* this = THIS;
-    Player* player = PLAYER;
+    EnFhgFire* this = (EnFhgFire*)thisx;
+    Player* player = GET_PLAYER(globalCtx);
 
     ActorShape_Init(&this->actor.shape, 0.0f, NULL, 0.0f);
     if ((this->actor.params == FHGFIRE_LIGHTNING_SHOCK) || (this->actor.params == FHGFIRE_LIGHTNING_BURST) ||
@@ -120,8 +118,7 @@ void EnFhgFire_Init(Actor* thisx, GlobalContext* globalCtx) {
         this->collider.dim.height = this->actor.world.rot.x * 0.13f;
         this->collider.dim.yShift = 0;
     } else if (this->actor.params == FHGFIRE_SPEAR_LIGHT) {
-        // "light spear"
-        osSyncPrintf("yari hikari ct 1\n");
+        osSyncPrintf("yari hikari ct 1\n"); // "light spear"
         EnFhgFire_SetUpdate(this, EnFhgFire_SpearLight);
         osSyncPrintf("yari hikari ct 2\n");
         this->work[FHGFIRE_TIMER] = this->actor.world.rot.x;
@@ -153,9 +150,9 @@ void EnFhgFire_Init(Actor* thisx, GlobalContext* globalCtx) {
         dxL = player->actor.world.pos.x - this->actor.world.pos.x;
         dyL = player->actor.world.pos.y + 30.0f - this->actor.world.pos.y;
         dzL = player->actor.world.pos.z - this->actor.world.pos.z;
-        this->actor.world.rot.y = Math_FAtan2F(dxL, dzL) * (0x8000 / M_PI);
+        this->actor.world.rot.y = RAD_TO_BINANG(Math_FAtan2F(dxL, dzL));
         dxzL = sqrtf(SQ(dxL) + SQ(dzL));
-        this->actor.world.rot.x = Math_FAtan2F(dyL, dxzL) * (0x8000 / M_PI);
+        this->actor.world.rot.x = RAD_TO_BINANG(Math_FAtan2F(dyL, dxzL));
         this->collider.dim.radius = 40;
         this->collider.dim.height = 50;
         this->collider.dim.yShift = -25;
@@ -167,7 +164,7 @@ void EnFhgFire_Init(Actor* thisx, GlobalContext* globalCtx) {
 
 void EnFhgFire_Destroy(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnFhgFire* this = THIS;
+    EnFhgFire* this = (EnFhgFire*)thisx;
 
     if ((this->actor.params == FHGFIRE_LIGHTNING_SHOCK) || (this->actor.params == FHGFIRE_LIGHTNING_BURST) ||
         (this->actor.params == FHGFIRE_ENERGY_BALL)) {
@@ -284,7 +281,7 @@ void EnFhgFire_LightningTrail(EnFhgFire* this, GlobalContext* globalCtx) {
 }
 
 void EnFhgFire_LightningShock(EnFhgFire* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     Vec3f pos;
 
     if (this->collider.base.atFlags & AT_HIT) {
@@ -304,16 +301,16 @@ void EnFhgFire_LightningShock(EnFhgFire* this, GlobalContext* globalCtx) {
         CollisionCheck_SetAT(globalCtx, &globalCtx->colChkCtx, &this->collider.base);
     }
 
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 50.0f, 100.0f, 1);
-    if (this->actor.bgCheckFlags & 8) {
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 50.0f, 100.0f, UPDBGCHECKINFO_FLAG_0);
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_WALL) {
         Actor_Kill(&this->actor);
     }
 }
 
 void EnFhgFire_LightningBurst(EnFhgFire* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
-    globalCtx->envCtx.unk_E1 = 0x01;
+    globalCtx->envCtx.fillScreen = true;
     this->actor.shape.rot.y += 0x1000;
 
     if (this->work[FHGFIRE_FX_TIMER] == 49) {
@@ -325,15 +322,16 @@ void EnFhgFire_LightningBurst(EnFhgFire* this, GlobalContext* globalCtx) {
         globalCtx->envCtx.unk_D6 = 0x14;
     }
     if (this->work[FHGFIRE_FX_TIMER] >= 48) {
-        globalCtx->envCtx.unk_E2[0] = globalCtx->envCtx.unk_E2[1] = globalCtx->envCtx.unk_E2[2] = 0xFF;
+        globalCtx->envCtx.screenFillColor[0] = globalCtx->envCtx.screenFillColor[1] =
+            globalCtx->envCtx.screenFillColor[2] = 255;
 
         if ((this->work[FHGFIRE_TIMER] % 2) != 0) {
-            globalCtx->envCtx.unk_E2[3] = 0x46;
+            globalCtx->envCtx.screenFillColor[3] = 70;
         } else {
-            globalCtx->envCtx.unk_E2[3] = 0x00;
+            globalCtx->envCtx.screenFillColor[3] = 0;
         }
     } else {
-        globalCtx->envCtx.unk_E2[3] = 0x00;
+        globalCtx->envCtx.screenFillColor[3] = 0;
     }
 
     if (this->work[FHGFIRE_TIMER] <= 20) {
@@ -353,7 +351,7 @@ void EnFhgFire_LightningBurst(EnFhgFire* this, GlobalContext* globalCtx) {
 
     if (this->work[FHGFIRE_TIMER] == 0) {
         Actor_Kill(&this->actor);
-        globalCtx->envCtx.unk_E1 = 0;
+        globalCtx->envCtx.fillScreen = false;
     }
 
     if (this->lensFlareTimer != 0) {
@@ -367,11 +365,11 @@ void EnFhgFire_LightningBurst(EnFhgFire* this, GlobalContext* globalCtx) {
         }
     }
 
-    D_8015FCF0 = this->lensFlareOn;
-    D_8015FCF8 = this->actor.world.pos;
-    D_8015FD06 = this->lensFlareScale;
-    D_8015FD08 = 10.0f;
-    D_8015FD0C = 0;
+    gCustomLensFlareOn = this->lensFlareOn;
+    gCustomLensFlarePos = this->actor.world.pos;
+    gLensFlareScale = this->lensFlareScale;
+    gLensFlareColorIntensity = 10.0f;
+    gLensFlareScreenFillAlpha = 0;
 }
 
 void EnFhgFire_SpearLight(EnFhgFire* this, GlobalContext* globalCtx) {
@@ -423,7 +421,7 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
     f32 dzPG;
     u8 killMode = BALL_FIZZLE;
     u8 canBottleReflect1;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (this->work[FHGFIRE_KILL_TIMER] != 0) {
         this->work[FHGFIRE_KILL_TIMER]--;
@@ -471,7 +469,7 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
         switch (this->work[FHGFIRE_FIRE_MODE]) {
             case FHGFIRE_LIGHT_GREEN:
                 canBottleReflect1 =
-                    ((player->stateFlags1 & 2) &&
+                    ((player->stateFlags1 & PLAYER_STATE1_1) &&
                      (ABS((s16)(player->actor.shape.rot.y - (s16)(bossGnd->actor.yawTowardsPlayer + 0x8000))) <
                       0x2000) &&
                      (sqrtf(SQ(dxL) + SQ(dyL) + SQ(dzL)) <= 25.0f))
@@ -495,8 +493,9 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
                     canBottleReflect2 = canBottleReflect1;
                     if (!canBottleReflect2 && (hurtbox->toucher.dmgFlags & 0x00100000)) {
                         killMode = BALL_IMPACT;
-                        Audio_PlaySoundGeneral(NA_SE_IT_SHIELD_REFLECT_MG, &player->actor.projectedPos, 4, &D_801333E0,
-                                               &D_801333E0, &D_801333E8);
+                        Audio_PlaySoundGeneral(NA_SE_IT_SHIELD_REFLECT_MG, &player->actor.projectedPos, 4,
+                                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                               &gSfxDefaultReverb);
                         func_800AA000(this->actor.xyzDistToPlayerSq, 0xFF, 0x14, 0x96);
                     } else {
                         if (bossGnd->flyMode == GND_FLY_NEUTRAL) {
@@ -511,21 +510,21 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
                                 this->work[FHGFIRE_RETURN_COUNT] = 100;
                             }
 
-                            if (!canBottleReflect2 && (player->swordAnimation >= 24)) {
+                            if (!canBottleReflect2 && (player->meleeWeaponAnimation >= PLAYER_MWA_SPIN_ATTACK_1H)) {
                                 this->actor.speedXZ = 20.0f;
                                 this->work[FHGFIRE_RETURN_COUNT] = 4;
                             } else {
                                 this->actor.speedXZ += 1.0f;
                             }
                         }
-                        this->actor.world.rot.y = (s16)(Math_FAtan2F(dxPG, dzPG) * (0x8000 / M_PI)) + angleModY;
+                        this->actor.world.rot.y = RAD_TO_BINANG(Math_FAtan2F(dxPG, dzPG)) + angleModY;
                         this->actor.world.rot.x =
-                            (s16)(Math_FAtan2F(dyPG, sqrtf((dxPG * dxPG) + (dzPG * dzPG))) * (0x8000 / M_PI)) +
-                            angleModX;
+                            RAD_TO_BINANG(Math_FAtan2F(dyPG, sqrtf((dxPG * dxPG) + (dzPG * dzPG)))) + angleModX;
                         this->work[FHGFIRE_FIRE_MODE] = FHGFIRE_LIGHT_BLUE;
                         this->work[FHGFIRE_FX_TIMER] = 2;
-                        Audio_PlaySoundGeneral(NA_SE_IT_SWORD_REFLECT_MG, &player->actor.projectedPos, 4, &D_801333E0,
-                                               &D_801333E0, &D_801333E8);
+                        Audio_PlaySoundGeneral(NA_SE_IT_SWORD_REFLECT_MG, &player->actor.projectedPos, 4,
+                                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                               &gSfxDefaultReverb);
                         func_800AA000(this->actor.xyzDistToPlayerSq, 0xB4, 0x14, 0x64);
                     }
                 } else if (sqrtf(SQ(dxL) + SQ(dyL) + SQ(dzL)) <= 25.0f) {
@@ -539,7 +538,7 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
                 break;
             case FHGFIRE_LIGHT_BLUE:
                 if ((bossGnd->flyMode == GND_FLY_RETURN) && (this->work[FHGFIRE_RETURN_COUNT] < 100)) {
-                    this->actor.world.rot.y = Math_FAtan2F(dxPG, dzPG) * (0x8000 / M_PI);
+                    this->actor.world.rot.y = RAD_TO_BINANG(Math_FAtan2F(dxPG, dzPG));
                     if ((sqrtf(SQ(dxPG) + SQ(dzPG)) < (150.0f + (this->actor.speedXZ * 8.0f)))) {
                         this->work[FHGFIRE_FIRE_MODE] = FHGFIRE_LIGHT_REFLECT;
                         bossGnd->returnSuccess = true;
@@ -550,16 +549,18 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
                         if ((sqrtf(SQ(dxPG) + SQ(dyPG) + SQ(dzPG)) < 100.0f)) {
                             bossGnd->returnSuccess = true;
                         }
-                        this->actor.world.rot.y = Math_FAtan2F(dxPG, dzPG) * (0x8000 / M_PI);
-                        this->actor.world.rot.x = Math_FAtan2F(dyPG, sqrtf(SQ(dxPG) + SQ(dzPG))) * (0x8000 / M_PI);
+                        this->actor.world.rot.y = RAD_TO_BINANG(Math_FAtan2F(dxPG, dzPG));
+                        this->actor.world.rot.x = RAD_TO_BINANG(Math_FAtan2F(dyPG, sqrtf(SQ(dxPG) + SQ(dzPG))));
                     }
                     if ((fabsf(dxPG) < 30.0f) && (fabsf(dzPG) < 30.0f) && (fabsf(dyPG) < 45.0f)) {
                         killMode = BALL_IMPACT;
                         bossGnd->returnCount = this->work[FHGFIRE_RETURN_COUNT] + 1;
                         Audio_PlaySoundGeneral(NA_SE_EN_FANTOM_HIT_THUNDER, &bossGnd->actor.projectedPos, 4,
-                                               &D_801333E0, &D_801333E0, &D_801333E8);
-                        Audio_PlaySoundGeneral(NA_SE_EN_FANTOM_DAMAGE, &bossGnd->actor.projectedPos, 4, &D_801333E0,
-                                               &D_801333E0, &D_801333E8);
+                                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                               &gSfxDefaultReverb);
+                        Audio_PlaySoundGeneral(NA_SE_EN_FANTOM_DAMAGE, &bossGnd->actor.projectedPos, 4,
+                                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale,
+                                               &gSfxDefaultReverb);
                     }
                 }
                 break;
@@ -576,9 +577,9 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
                         EffectSsFhgFlash_SpawnLightBall(globalCtx, &this->actor.world.pos, &sp88, &sp7C,
                                                         (s16)(Rand_ZeroOne() * 40.0f) + 80, FHGFLASH_LIGHTBALL_GREEN);
                     }
-                    this->actor.world.rot.y = Math_FAtan2F(dxL, dzL) * (0x8000 / M_PI);
+                    this->actor.world.rot.y = RAD_TO_BINANG(Math_FAtan2F(dxL, dzL));
                     dxzL = sqrtf(SQ(dxL) + SQ(dzL));
-                    this->actor.world.rot.x = Math_FAtan2F(dyL, dxzL) * (0x8000 / M_PI);
+                    this->actor.world.rot.x = RAD_TO_BINANG(Math_FAtan2F(dyL, dxzL));
                     this->work[FHGFIRE_FIRE_MODE] = FHGFIRE_LIGHT_GREEN;
                     Audio_PlayActorSound2(&this->actor, NA_SE_IT_SWORD_REFLECT_MG);
                     this->actor.speedXZ += 2.0f;
@@ -589,8 +590,10 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
         osSyncPrintf("F_FIRE_MODE %d\n", this->work[FHGFIRE_FIRE_MODE]);
         osSyncPrintf("fly_mode    %d\n", bossGnd->flyMode);
         if (this->work[FHGFIRE_FX_TIMER] == 0) {
-            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 50.0f, 100.0f, 7);
-            if ((this->actor.bgCheckFlags & 0x19) || killMode) {
+            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 50.0f, 100.0f,
+                                    UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_1 | UPDBGCHECKINFO_FLAG_2);
+            if ((this->actor.bgCheckFlags & (BGCHECKFLAG_GROUND | BGCHECKFLAG_WALL | BGCHECKFLAG_CEILING)) ||
+                killMode) {
                 u8 lightBallColor2 = FHGFLASH_LIGHTBALL_GREEN;
                 s16 i4;
                 Vec3f sp6C;
@@ -632,7 +635,7 @@ void EnFhgFire_EnergyBall(EnFhgFire* this, GlobalContext* globalCtx) {
             this->actor.speedXZ = 20.0f;
         }
         Audio_PlayActorSound2(&this->actor, NA_SE_EN_FANTOM_FIRE - SFX_FLAG);
-        // Why ah ah ah ah
+        // "Why ah ah ah ah"
         osSyncPrintf("なぜだああああああああ      %d\n", this->work[FHGFIRE_VARIANCE_TIMER]);
     }
 }
@@ -679,7 +682,7 @@ void EnFhgFire_PhantomWarp(EnFhgFire* this, GlobalContext* globalCtx) {
 
 void EnFhgFire_Update(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnFhgFire* this = THIS;
+    EnFhgFire* this = (EnFhgFire*)thisx;
 
     this->work[FHGFIRE_VARIANCE_TIMER]++;
 
@@ -693,13 +696,13 @@ void EnFhgFire_Update(Actor* thisx, GlobalContext* globalCtx) {
     this->updateFunc(this, globalCtx);
 }
 
-static u64* sDustTextures[] = {
+static void* sDustTextures[] = {
     gDust1Tex, gDust2Tex, gDust3Tex, gDust4Tex, gDust5Tex, gDust6Tex, gDust7Tex, gDust8Tex,
 };
 
 void EnFhgFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnFhgFire* this = THIS;
+    EnFhgFire* this = (EnFhgFire*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_fhg_fire.c", 1723);
 
@@ -713,7 +716,7 @@ void EnFhgFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
         gSPDisplayList(POLY_XLU_DISP++, SEGMENTED_TO_VIRTUAL(gPhantomLightningBlastDL));
     } else if ((this->actor.params == FHGFIRE_SPEAR_LIGHT) || (this->actor.params == FHGFIRE_ENERGY_BALL)) {
         osSyncPrintf("yari hikari draw 1\n");
-        func_800D1FD4(&globalCtx->mf_11DA0);
+        Matrix_ReplaceRotation(&globalCtx->billboardMtxF);
         func_80093D84(globalCtx->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (s8)this->fwork[FHGFIRE_ALPHA]);
 
@@ -723,7 +726,7 @@ void EnFhgFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
             gDPSetEnvColor(POLY_XLU_DISP++, 165, 255, 75, 0);
         }
         gDPPipeSync(POLY_XLU_DISP++);
-        Matrix_RotateZ((this->actor.shape.rot.z / (f32)0x8000) * 3.1416f, 1);
+        Matrix_RotateZ((this->actor.shape.rot.z / (f32)0x8000) * 3.1416f, MTXMODE_APPLY);
         gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(globalCtx->state.gfxCtx, "../z_en_fhg_fire.c", 1801),
                   G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_MODELVIEW);
         gSPDisplayList(POLY_XLU_DISP++, gPhantomEnergyBallDL);
@@ -743,7 +746,7 @@ void EnFhgFire_Draw(Actor* thisx, GlobalContext* globalCtx) {
         gSPDisplayList(POLY_XLU_DISP++, gPhantomWarpDL);
     } else {
         osSyncPrintf("FF DRAW 1\n");
-        Matrix_Translate(0.0f, -100.0f, 0.0f, 1);
+        Matrix_Translate(0.0f, -100.0f, 0.0f, MTXMODE_APPLY);
         func_80093D84(globalCtx->state.gfxCtx);
         gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, 255, 255, 255, (s8)this->fwork[FHGFIRE_ALPHA]);
         gDPSetEnvColor(POLY_XLU_DISP++, 0, 255, 30, 0);

@@ -7,9 +7,7 @@
 #include "z_bg_spot12_gate.h"
 #include "objects/object_spot12_obj/object_spot12_obj.h"
 
-#define FLAGS 0x00000000
-
-#define THIS ((BgSpot12Gate*)thisx)
+#define FLAGS 0
 
 void BgSpot12Gate_Init(Actor* thisx, GlobalContext* globalCtx);
 void BgSpot12Gate_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -44,8 +42,7 @@ static InitChainEntry sInitChain[] = {
     ICHAIN_F32(uncullZoneDownward, 1200, ICHAIN_STOP),
 };
 
-void BgSpot12Gate_InitDynaPoly(BgSpot12Gate* this, GlobalContext* globalCtx, CollisionHeader* collision,
-                               DynaPolyMoveFlag flags) {
+void BgSpot12Gate_InitDynaPoly(BgSpot12Gate* this, GlobalContext* globalCtx, CollisionHeader* collision, s32 flags) {
     s32 pad;
     CollisionHeader* colHeader = NULL;
     s32 pad2;
@@ -60,7 +57,7 @@ void BgSpot12Gate_InitDynaPoly(BgSpot12Gate* this, GlobalContext* globalCtx, Col
 }
 
 void BgSpot12Gate_Init(Actor* thisx, GlobalContext* globalCtx) {
-    BgSpot12Gate* this = THIS;
+    BgSpot12Gate* this = (BgSpot12Gate*)thisx;
 
     BgSpot12Gate_InitDynaPoly(this, globalCtx, &gGerudoFortressWastelandGateCol, DPM_UNK);
     Actor_ProcessInitChain(&this->dyna.actor, sInitChain);
@@ -73,7 +70,7 @@ void BgSpot12Gate_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void BgSpot12Gate_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    BgSpot12Gate* this = THIS;
+    BgSpot12Gate* this = (BgSpot12Gate*)thisx;
 
     DynaPoly_DeleteBgActor(globalCtx, &globalCtx->colCtx.dyna, this->dyna.bgId);
 }
@@ -113,7 +110,7 @@ void func_808B318C(BgSpot12Gate* this, GlobalContext* globalCtx) {
     if (Math_StepToF(&this->dyna.actor.world.pos.y, this->dyna.actor.home.pos.y + 200.0f,
                      this->dyna.actor.velocity.y)) {
         func_808B3274(this);
-        var = Quake_Add(ACTIVE_CAM, 3);
+        var = Quake_Add(GET_ACTIVE_CAM(globalCtx), 3);
         Quake_SetSpeed(var, -0x3CB0);
         Quake_SetQuakeValues(var, 3, 0, 0, 0);
         Quake_SetCountdown(var, 0xC);
@@ -132,7 +129,7 @@ void func_808B3298(BgSpot12Gate* this, GlobalContext* globalCtx) {
 }
 
 void BgSpot12Gate_Update(Actor* thisx, GlobalContext* globalCtx) {
-    BgSpot12Gate* this = THIS;
+    BgSpot12Gate* this = (BgSpot12Gate*)thisx;
 
     if (this->unk_168 > 0) {
         this->unk_168--;

@@ -1,5 +1,5 @@
-#ifndef _Z_DEMO_DU_H_
-#define _Z_DEMO_DU_H_
+#ifndef Z_DEMO_DU_H
+#define Z_DEMO_DU_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -21,8 +21,6 @@ typedef struct DemoDu {
     /* 0x01B0 */ s32 lastAction;
 } DemoDu; // size = 0x01B4
 
-extern const ActorInit Demo_Du_InitVars;
-
 // This is the parameter of this actor,
 typedef enum DemoDu_Cutscene {
     /* 0x00 */ DEMO_DU_CS_FIREMEDALLION, // default
@@ -37,7 +35,7 @@ typedef enum DemoDu_Cutscene {
  * DEMO_DU_CS_GORONS_RUBY: Map selector -> Map 16 (SPOT16) -> Stage 01
  * DEMO_DU_CS_CHAMBER_AFTER_GANON: Map selector -> Map 21 -> Stage 02
  * DEMO_DU_CS_CREDITS: Map selector -> Map 16 (SPOT16) -> Stage 04
- * 
+ *
  */
 
 #endif

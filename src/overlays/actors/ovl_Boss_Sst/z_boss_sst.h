@@ -1,5 +1,5 @@
-#ifndef _Z_BOSS_SST_H_
-#define _Z_BOSS_SST_H_
+#ifndef Z_BOSS_SST_H
+#define Z_BOSS_SST_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -8,6 +8,7 @@ struct BossSst;
 
 typedef void (*BossSstActionFunc)(struct BossSst*, GlobalContext*);
 
+#define BOSS_SST_EFFECT_COUNT 18
 
 typedef struct {
     /* 0x0000 */ Vec3f pos;
@@ -47,7 +48,7 @@ typedef struct BossSst {
     /* 0x03D4 */ ColliderJntSph colliderJntSph;
     /* 0x03F4 */ ColliderJntSphElement colliderItems[11];
     /* 0x06B4 */ ColliderCylinder colliderCyl;
-    /* 0x0700 */ BossSstEffect effects[18];
+    /* 0x0700 */ BossSstEffect effects[BOSS_SST_EFFECT_COUNT];
     /* 0x09D0 */ s16 trailIndex;
     /* 0x09D2 */ s16 trailCount;
     /* 0x09D4 */ BossSstHandTrail handTrails[7];
@@ -58,7 +59,5 @@ typedef enum {
     /*  0 */ BONGO_LEFT_HAND,
     /*  1 */ BONGO_RIGHT_HAND
 } BossSstType;
-
-extern const ActorInit Boss_Sst_InitVars;
 
 #endif

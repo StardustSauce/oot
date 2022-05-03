@@ -1,5 +1,5 @@
-#ifndef _Z_EN_NWC_H_
-#define _Z_EN_NWC_H_
+#ifndef Z_EN_NWC_H
+#define Z_EN_NWC_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -22,7 +22,7 @@ typedef struct EnNwcChick {
     /* 0x30 */ Vec3s rot;
     /* 0x36 */ u16 height;
     /* 0x38 */ CollisionPoly* floorPoly;
-    /* 0x44 */ char unk_3C[0x20]; 
+    /* 0x44 */ char unk_3C[0x20];
 } EnNwcChick; // size = 0x5C
 
 typedef struct EnNwc {
@@ -32,7 +32,5 @@ typedef struct EnNwc {
     /* 0x0170 */ EnNwcChick chicks[16];
     /* 0x0730 */ EnNwcUpdateFunc updateFunc;
 } EnNwc; // size = 0x0734
-
-extern const ActorInit En_Nwc_InitVars;
 
 #endif

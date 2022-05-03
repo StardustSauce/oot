@@ -7,9 +7,7 @@
 #include "z_en_tp.h"
 #include "objects/object_tp/object_tp.h"
 
-#define FLAGS 0x00000000
-
-#define THIS ((EnTp*)thisx)
+#define FLAGS 0
 
 void EnTp_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnTp_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -130,16 +128,12 @@ void EnTp_SetupAction(EnTp* this, EnTpActionFunc actionFunc) {
     this->actionFunc = actionFunc;
 }
 
-#ifdef NON_MATCHING
-// Regalloc, some stack, and compiler refuses to put zero in $s4 with temp_s4; all seems to be related
 void EnTp_Init(Actor* thisx, GlobalContext* globalCtx2) {
     GlobalContext* globalCtx = globalCtx2;
-    EnTp* this = THIS;
-
+    EnTp* this = (EnTp*)thisx;
     EnTp* now;
     EnTp* next;
     s32 i;
-    s64 temp_s4;
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     this->actor.targetMode = 3;
@@ -153,21 +147,20 @@ void EnTp_Init(Actor* thisx, GlobalContext* globalCtx2) {
     Collider_SetJntSph(globalCtx, &this->collider, &this->actor, &sJntSphInit, this->colliderItems);
 
     if (this->actor.params <= TAILPASARAN_HEAD) {
-        this->actor.naviEnemyId = 6;
+        this->actor.naviEnemyId = NAVI_ENEMY_TAILPASARAN;
         this->timer = 0;
         this->collider.base.acFlags |= AC_HARD;
         this->collider.elements->dim.modelSphere.radius = this->collider.elements->dim.worldSphere.radius = 8;
         EnTp_Head_SetupWait(this);
         this->actor.focus.pos = this->actor.world.pos;
-        this->actor.flags |= 0x15;
+        this->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4;
         Actor_SetScale(&this->actor, 1.5f);
 
         for (i = 0; i <= 6; i++) {
-            temp_s4 = 0;
-
             next = (EnTp*)Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_EN_TP, this->actor.world.pos.x,
-                                      this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, temp_s4);
+                                      this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0, 0 * i);
 
+            if (0 * i) {} // Very fake, but needed to get the s registers right
             if (next != NULL) {
                 now->actor.child = &next->actor;
                 next->actor.parent = &now->actor;
@@ -176,13 +169,14 @@ void EnTp_Init(Actor* thisx, GlobalContext* globalCtx2) {
                 Actor_SetScale(&next->actor, 0.3f);
 
                 if (i == 2) {
-                    next->actor.flags |= 0x15;
+                    next->actor.flags |= ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4;
                     next->unk_150 = 1; // Why?
                 }
 
                 next->timer = next->unk_15C = i * -5;
                 next->horizontalVariation = 6.0f - (i * 0.75f);
                 now = next;
+                if (0 * i) {}
             }
         }
     } else if (this->actor.params == TAILPASARAN_TAIL) {
@@ -191,12 +185,9 @@ void EnTp_Init(Actor* thisx, GlobalContext* globalCtx2) {
         EnTp_Fragment_SetupFade(this);
     }
 }
-#else
-#pragma GLOBAL_ASM("asm/non_matchings/overlays/actors/ovl_En_Tp/EnTp_Init.s")
-#endif
 
 void EnTp_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnTp* this = THIS;
+    EnTp* this = (EnTp*)thisx;
 
     Collider_DestroyJntSph(globalCtx, &this->collider);
 }
@@ -218,13 +209,13 @@ void EnTp_Tail_FollowHead(EnTp* this, GlobalContext* globalCtx) {
         }
     } else {
         if (this->unk_150 != 0) {
-            this->actor.flags |= 1;
+            this->actor.flags |= ACTOR_FLAG_0;
         }
 
         if (this->head->unk_150 != 0) {
             this->actor.speedXZ = this->red = this->actor.velocity.y = this->heightPhase = 0.0f;
             if (this->actor.world.pos.y < this->head->actor.home.pos.y) {
-                this->actor.flags &= ~1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
             }
 
             this->actor.world.pos = this->actor.parent->prevPos;
@@ -247,11 +238,11 @@ void EnTp_Head_SetupApproachPlayer(EnTp* this) {
 }
 
 void EnTp_Head_ApproachPlayer(EnTp* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     Math_SmoothStepToF(&this->actor.world.pos.y, player->actor.world.pos.y + 30.0f, 1.0f, 0.5f, 0.0f);
-    Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                           &D_801333E8);
+    Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 
     if (this->collider.base.atFlags & AT_HIT) {
         this->collider.base.atFlags &= ~AT_HIT;
@@ -357,7 +348,7 @@ void EnTp_Fragment_SetupFade(EnTp* this) {
     this->actor.velocity.x = (Rand_ZeroOne() - 0.5f) * 1.5f;
     this->actor.velocity.y = (Rand_ZeroOne() - 0.5f) * 1.5f;
     this->actor.velocity.z = (Rand_ZeroOne() - 0.5f) * 1.5f;
-    this->actor.flags &= ~1;
+    this->actor.flags &= ~ACTOR_FLAG_0;
     EnTp_SetupAction(this, EnTp_Fragment_Fade);
 }
 
@@ -382,13 +373,13 @@ void EnTp_Head_SetupTakeOff(EnTp* this) {
  */
 void EnTp_Head_TakeOff(EnTp* this, GlobalContext* globalCtx) {
     s32 pad;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     Math_SmoothStepToF(&this->actor.speedXZ, 2.5f, 0.1f, 0.2f, 0.0f);
     Math_SmoothStepToF(&this->actor.world.pos.y, player->actor.world.pos.y + 85.0f + this->horizontalVariation, 1.0f,
                        this->actor.speedXZ * 0.25f, 0.0f);
-    Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                           &D_801333E8);
+    Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
 
     if (this->collider.base.atFlags & AT_HIT) {
         this->collider.base.atFlags &= ~AT_HIT;
@@ -438,7 +429,7 @@ void EnTp_Head_SetupWait(EnTp* this) {
  * Awaken and rise from the ground when Player is closer than 200
  */
 void EnTp_Head_Wait(EnTp* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 yaw;
 
     this->unk_15C--;
@@ -485,8 +476,8 @@ void EnTp_Head_Wait(EnTp* this, GlobalContext* globalCtx) {
     this->actor.shape.rot.y = this->actor.world.rot.y;
 
     if (this->actor.world.pos.y != this->actor.home.pos.y) {
-        Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                               &D_801333E8);
+        Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                               &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
     }
 }
 
@@ -555,8 +546,8 @@ void EnTp_Head_BurrowReturnHome(EnTp* this, GlobalContext* globalCtx) {
         }
 
         if (this->actor.world.pos.y != this->actor.home.pos.y) {
-            Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                                   &D_801333E8);
+            Audio_PlaySoundGeneral(NA_SE_EN_TAIL_FLY - SFX_FLAG, &this->actor.projectedPos, 4,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
 
         if (closeToFloor && ((globalCtx->gameplayFrames & 1) != 0)) {
@@ -601,7 +592,7 @@ void EnTp_UpdateDamage(EnTp* this, GlobalContext* globalCtx) {
             }
 
             if (this->actor.colChkInfo.health == 0) {
-                this->actor.flags &= ~1;
+                this->actor.flags &= ~ACTOR_FLAG_0;
                 head = this->head;
 
                 if (head->actor.params <= TAILPASARAN_HEAD) {
@@ -654,16 +645,16 @@ void EnTp_UpdateDamage(EnTp* this, GlobalContext* globalCtx) {
 
 void EnTp_Update(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnTp* this = THIS;
+    EnTp* this = (EnTp*)thisx;
     Vec3f kiraVelocity = { 0.0f, 0.0f, 0.0f };
     Vec3f kiraAccel = { 0.0f, -0.6f, 0.0f };
     Vec3f kiraPos;
     Color_RGBA8 kiraPrimColor = { 0, 0, 255, 255 };
     Color_RGBA8 kiraEnvColor = { 0, 0, 0, 0 };
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 yawToWall;
 
-    if (player->stateFlags1 & 0x4000000) { // Shielding
+    if (player->stateFlags1 & PLAYER_STATE1_26) { // Shielding
         this->damageEffect = TAILPASARAN_DMGEFF_NONE;
     }
 
@@ -677,11 +668,12 @@ void EnTp_Update(Actor* thisx, GlobalContext* globalCtx) {
         Actor_MoveForward(&this->actor);
 
         if (this->actionIndex != TAILPASARAN_ACTION_HEAD_BURROWRETURNHOME) {
-            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 15.0f, 10.0f, 5);
+            Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 0.0f, 15.0f, 10.0f,
+                                    UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2);
         }
 
         // Turn away from wall
-        if ((this->actor.speedXZ != 0.0f) && (this->actor.bgCheckFlags & 8)) {
+        if ((this->actor.speedXZ != 0.0f) && (this->actor.bgCheckFlags & BGCHECKFLAG_WALL)) {
             yawToWall = this->actor.wallYaw - this->actor.world.rot.y;
 
             if (ABS(yawToWall) > 0x4000) {
@@ -698,8 +690,8 @@ void EnTp_Update(Actor* thisx, GlobalContext* globalCtx) {
         this->actor.shape.rot.z += 0x800;
 
         if (this->actor.shape.rot.z == 0) {
-            Audio_PlaySoundGeneral(NA_SE_EN_TAIL_CRY, &this->actor.projectedPos, 4, &D_801333E0, &D_801333E0,
-                                   &D_801333E8);
+            Audio_PlaySoundGeneral(NA_SE_EN_TAIL_CRY, &this->actor.projectedPos, 4, &gSfxDefaultFreqAndVolScale,
+                                   &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
         }
 
         if (this->actionIndex >= TAILPASARAN_ACTION_TAIL_FOLLOWHEAD) {
@@ -736,7 +728,7 @@ void EnTp_Update(Actor* thisx, GlobalContext* globalCtx) {
 
 void EnTp_Draw(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    EnTp* this = THIS;
+    EnTp* this = (EnTp*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_tp.c", 1451);
 
@@ -751,7 +743,7 @@ void EnTp_Draw(Actor* thisx, GlobalContext* globalCtx) {
             Matrix_Translate(0.0f, 0.0f, 8.0f, MTXMODE_APPLY);
         } else {
             func_80093D84(globalCtx->state.gfxCtx);
-            func_800D1FD4(&globalCtx->mf_11DA0);
+            Matrix_ReplaceRotation(&globalCtx->billboardMtxF);
 
             gDPSetPrimColor(POLY_XLU_DISP++, 0, 0, this->red, 0, 255, this->alpha);
             gDPPipeSync(POLY_XLU_DISP++);

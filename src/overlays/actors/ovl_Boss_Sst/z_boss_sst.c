@@ -8,10 +8,9 @@
 #include "objects/object_sst/object_sst.h"
 #include "objects/gameplay_keep/gameplay_keep.h"
 #include "overlays/actors/ovl_Bg_Sst_Floor/z_bg_sst_floor.h"
+#include "overlays/actors/ovl_Door_Warp1/z_door_warp1.h"
 
-#define FLAGS 0x00000435
-
-#define THIS ((BossSst*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_2 | ACTOR_FLAG_4 | ACTOR_FLAG_5 | ACTOR_FLAG_10)
 
 #define vParity actionVar
 #define vVanish actionVar
@@ -53,8 +52,8 @@ void BossSst_UpdateHand(Actor* thisx, GlobalContext* globalCtx);
 void BossSst_UpdateHead(Actor* thisx, GlobalContext* globalCtx);
 void BossSst_DrawHand(Actor* thisx, GlobalContext* globalCtx);
 void BossSst_DrawHead(Actor* thisx, GlobalContext* globalCtx);
-void BossSst_UpdateEffect(Actor* thisx, GlobalContext* globalCtx);
-void BossSst_DrawEffect(Actor* thisx, GlobalContext* globalCtx);
+void BossSst_UpdateEffects(Actor* thisx, GlobalContext* globalCtx);
+void BossSst_DrawEffects(Actor* thisx, GlobalContext* globalCtx);
 
 void BossSst_HeadSfx(BossSst* this, u16 sfxId);
 
@@ -259,14 +258,14 @@ static AnimationHeader* sHandPushoffPoses[] = { &gBongoLeftHandPushoffPoseAnim, 
 static AnimationHeader* sHandHangPoses[] = { &gBongoLeftHandHangPoseAnim, &gBongoRightHandHangPoseAnim };
 
 static InitChainEntry sInitChain[] = {
-    ICHAIN_S8(naviEnemyId, 41, ICHAIN_CONTINUE),
+    ICHAIN_S8(naviEnemyId, NAVI_ENEMY_BONGO_BONGO, ICHAIN_CONTINUE),
     ICHAIN_U8(targetMode, 5, ICHAIN_CONTINUE),
     ICHAIN_VEC3F_DIV1000(scale, 20, ICHAIN_STOP),
 };
 
 void BossSst_Init(Actor* thisx, GlobalContext* globalCtx2) {
     GlobalContext* globalCtx = globalCtx2;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     Actor_ProcessInitChain(&this->actor, sInitChain);
     Collider_InitCylinder(globalCtx, &this->colliderCyl);
@@ -289,7 +288,7 @@ void BossSst_Init(Actor* thisx, GlobalContext* globalCtx2) {
         this->actor.shape.rot.y = 0;
         if (Flags_GetClear(globalCtx, globalCtx->roomCtx.curRoom.num)) {
             Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_DOOR_WARP1, ROOM_CENTER_X, ROOM_CENTER_Y,
-                        ROOM_CENTER_Z + 400.0f, 0, 0, 0, -1);
+                        ROOM_CENTER_Z + 400.0f, 0, 0, 0, WARP_DUNGEON_ADULT);
             Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_ITEM_B_HEART, ROOM_CENTER_X, ROOM_CENTER_Y,
                         ROOM_CENTER_Z - 200.0f, 0, 0, 0, 0);
             Actor_Kill(&this->actor);
@@ -305,7 +304,7 @@ void BossSst_Init(Actor* thisx, GlobalContext* globalCtx2) {
             sHands[LEFT]->actor.child = &sHands[RIGHT]->actor;
             sHands[RIGHT]->actor.child = &sHands[LEFT]->actor;
 
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             this->actor.update = BossSst_UpdateHead;
             this->actor.draw = BossSst_DrawHead;
             this->radius = -650.0f;
@@ -330,18 +329,18 @@ void BossSst_Init(Actor* thisx, GlobalContext* globalCtx2) {
         ActorShape_Init(&this->actor.shape, 0.0f, ActorShadow_DrawCircle, 95.0f);
         this->handZPosMod = -3500;
         this->actor.targetArrowOffset = 5000.0f;
-        this->actor.flags &= ~1;
+        this->actor.flags &= ~ACTOR_FLAG_0;
         BossSst_HandSetupWait(this);
     }
 }
 
 void BossSst_Destroy(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     Collider_DestroyJntSph(globalCtx, &this->colliderJntSph);
     Collider_DestroyCylinder(globalCtx, &this->colliderCyl);
-    func_800F89E8(&this->center);
+    Audio_StopSfxByPos(&this->center);
 }
 
 void BossSst_HeadSetupLurk(BossSst* this) {
@@ -359,7 +358,7 @@ void BossSst_HeadLurk(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HeadSetupIntro(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     this->timer = 611;
     this->ready = false;
@@ -371,7 +370,7 @@ void BossSst_HeadSetupIntro(BossSst* this, GlobalContext* globalCtx) {
     player->targetYaw = -0x8000;
     player->currentYaw = -0x8000;
     player->fallStartHeight = 0;
-    player->stateFlags1 |= 0x20;
+    player->stateFlags1 |= PLAYER_STATE1_5;
 
     func_80064520(globalCtx, &globalCtx->csCtx);
     func_8002DF54(globalCtx, &this->actor, 8);
@@ -379,17 +378,17 @@ void BossSst_HeadSetupIntro(BossSst* this, GlobalContext* globalCtx) {
     Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_WAIT);
     Gameplay_ChangeCameraStatus(globalCtx, sCutsceneCamera, CAM_STAT_ACTIVE);
     Math_Vec3f_Copy(&sCameraAt, &player->actor.world.pos);
-    if (gSaveContext.eventChkInf[7] & 0x80) {
+    if (GET_EVENTCHKINF(EVENTCHKINF_77)) {
         sCameraEye.z = ROOM_CENTER_Z - 100.0f;
     }
 
     Gameplay_CameraSetAtEye(globalCtx, sCutsceneCamera, &sCameraAt, &sCameraEye);
-    Audio_QueueSeqCmd(0x100100FF);
+    Audio_QueueSeqCmd(0x1 << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0x100FF);
     this->actionFunc = BossSst_HeadIntro;
 }
 
 void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s32 tempo;
     s32 introStateTimer;
     s32 revealStateTimer;
@@ -403,9 +402,9 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
     }
 
     if (this->timer == 0) {
-        sHands[RIGHT]->actor.flags |= 1;
-        sHands[LEFT]->actor.flags |= 1;
-        player->stateFlags1 &= ~0x20;
+        sHands[RIGHT]->actor.flags |= ACTOR_FLAG_0;
+        sHands[LEFT]->actor.flags |= ACTOR_FLAG_0;
+        player->stateFlags1 &= ~PLAYER_STATE1_5;
         func_80064534(globalCtx, &globalCtx->csCtx);
         func_8002DF54(globalCtx, &this->actor, 7);
         sCameraAt.y += 30.0f;
@@ -415,7 +414,7 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
         Gameplay_ChangeCameraStatus(globalCtx, sCutsceneCamera, CAM_STAT_WAIT);
         Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_ACTIVE);
         Gameplay_ClearCamera(globalCtx, sCutsceneCamera);
-        gSaveContext.eventChkInf[7] |= 0x80;
+        SET_EVENTCHKINF(EVENTCHKINF_77);
         BossSst_HeadSetupNeutral(this);
         this->colliderJntSph.base.ocFlags1 |= OC1_ON;
         sHands[LEFT]->colliderJntSph.base.ocFlags1 |= OC1_ON;
@@ -432,13 +431,13 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
         }
 
         Math_Vec3f_Copy(&sCameraAt, &player->actor.world.pos);
-        if (player->actor.bgCheckFlags & 2) {
+        if (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND_TOUCH) {
             if (!this->ready) {
                 sFloor->dyna.actor.params = BONGOFLOOR_HIT;
                 this->ready = true;
                 func_800AA000(this->actor.xyzDistToPlayerSq, 0xFF, 0x14, 0x96);
                 Audio_PlayActorSound2(&sFloor->dyna.actor, NA_SE_EN_SHADEST_TAIKO_HIGH);
-            } else if (gSaveContext.eventChkInf[7] & 0x80) {
+            } else if (GET_EVENTCHKINF(EVENTCHKINF_77)) {
                 sHands[RIGHT]->actor.draw = BossSst_DrawHand;
                 sHands[LEFT]->actor.draw = BossSst_DrawHand;
                 this->actor.draw = BossSst_DrawHead;
@@ -565,7 +564,7 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
         }
         if (this->timer <= 198) {
             revealStateTimer = 198 - this->timer;
-            if ((gSaveContext.eventChkInf[7] & 0x80) && (revealStateTimer <= 44)) {
+            if (GET_EVENTCHKINF(EVENTCHKINF_77) && (revealStateTimer <= 44)) {
                 sCameraAt.x += 492.0f * 0.01f;
                 sCameraAt.y += 200.0f * 0.01f;
                 sCameraEye.x -= 80.0f * 0.01f;
@@ -578,7 +577,7 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
                 sCameraEye.y += 400.0f * 0.01f;
                 sCameraEye.z += 1550.0f * 0.01f;
                 this->vVanish = true;
-                this->actor.flags |= 0x80;
+                this->actor.flags |= ACTOR_FLAG_7;
             } else if (revealStateTimer < 40) {
                 sCameraAt.x += 125.0f * 0.01f;
                 sCameraAt.y += 350.0f * 0.01f;
@@ -594,11 +593,11 @@ void BossSst_HeadIntro(BossSst* this, GlobalContext* globalCtx) {
                     sCameraEye.y += 125.0f * 0.01f;
                     sCameraEye.z -= 350.0f * 0.01f;
                 } else if (revealStateTimer == 85) {
-                    if (!(gSaveContext.eventChkInf[7] & 0x80)) {
+                    if (!GET_EVENTCHKINF(EVENTCHKINF_77)) {
                         TitleCard_InitBossName(globalCtx, &globalCtx->actorCtx.titleCtx,
-                                               SEGMENTED_TO_VIRTUAL(&gBongoTitleCardTex), 160, 180, 128, 40);
+                                               SEGMENTED_TO_VIRTUAL(gBongoTitleCardTex), 160, 180, 128, 40);
                     }
-                    Audio_QueueSeqCmd(0x1B);
+                    Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS);
                     Animation_MorphToPlayOnce(&this->skelAnime, &gBongoHeadEyeCloseAnim, -5.0f);
                     BossSst_HeadSfx(this, NA_SE_EN_SHADEST_DISAPPEAR);
                 }
@@ -651,15 +650,16 @@ void BossSst_HeadNeutral(BossSst* this, GlobalContext* globalCtx) {
     }
 
     if (this->timer == 0) {
-        if ((PLAYER->actor.world.pos.y > -50.0f) && !(PLAYER->stateFlags1 & 0x6080)) {
+        if ((GET_PLAYER(globalCtx)->actor.world.pos.y > -50.0f) &&
+            !(GET_PLAYER(globalCtx)->stateFlags1 & (PLAYER_STATE1_7 | PLAYER_STATE1_13 | PLAYER_STATE1_14))) {
             sHands[Rand_ZeroOne() <= 0.5f]->ready = true;
             BossSst_HeadSetupWait(this);
         } else {
             this->timer = 28;
         }
     } else {
-        Math_ApproachS(&this->actor.shape.rot.y, Actor_WorldYawTowardPoint(&PLAYER->actor, &sRoomCenter) + 0x8000, 4,
-                       0x400);
+        Math_ApproachS(&this->actor.shape.rot.y,
+                       Actor_WorldYawTowardPoint(&GET_PLAYER(globalCtx)->actor, &sRoomCenter) + 0x8000, 4, 0x400);
         if ((this->timer == 28) || (this->timer == 84)) {
             BossSst_HeadSfx(this, NA_SE_EN_SHADEST_PRAY);
         }
@@ -760,7 +760,7 @@ void BossSst_HeadCharge(BossSst* this, GlobalContext* globalCtx) {
         sHands[LEFT]->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
         sHands[RIGHT]->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
         func_8002F71C(globalCtx, &this->actor, 10.0f, this->actor.shape.rot.y, 5.0f);
-        func_8002F7DC(&PLAYER->actor, NA_SE_PL_BODY_HIT);
+        func_8002F7DC(&GET_PLAYER(globalCtx)->actor, NA_SE_PL_BODY_HIT);
     }
 }
 
@@ -814,7 +814,7 @@ void BossSst_HeadSetupStunned(BossSst* this) {
     this->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
     this->colliderCyl.base.acFlags &= ~AC_ON;
     this->vVanish = false;
-    this->actor.flags &= ~0x80;
+    this->actor.flags &= ~ACTOR_FLAG_7;
     BossSst_HeadSfx(this, NA_SE_EN_SHADEST_FREEZE);
     this->actionFunc = BossSst_HeadStunned;
 }
@@ -882,7 +882,7 @@ void BossSst_HeadVulnerable(BossSst* this, GlobalContext* globalCtx) {
     Math_StepToF(&sHandOffsets[RIGHT].z, 600.0f, 20.0f);
     Math_StepToF(&sHandOffsets[LEFT].x, 200.0f, 20.0f);
     Math_StepToF(&sHandOffsets[RIGHT].x, -200.0f, 20.0f);
-    if ((this->actor.flags & 0x2000) == 0x2000) {
+    if (CHECK_FLAG_ALL(this->actor.flags, ACTOR_FLAG_13)) {
         this->timer += 2;
         this->timer = CLAMP_MAX(this->timer, 50);
     } else {
@@ -999,7 +999,7 @@ void BossSst_UpdateDeathCamera(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HeadSetupDeath(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     Animation_MorphToLoop(&this->skelAnime, &gBongoHeadEyeOpenIdleAnim, -5.0f);
     BossSst_HeadSfx(this, NA_SE_EN_SHADEST_DEAD);
@@ -1011,14 +1011,14 @@ void BossSst_HeadSetupDeath(BossSst* this, GlobalContext* globalCtx) {
     this->colliderJntSph.base.ocFlags1 &= ~OC1_ON;
     sHands[LEFT]->colliderJntSph.base.ocFlags1 &= ~OC1_ON;
     sHands[RIGHT]->colliderJntSph.base.ocFlags1 &= ~OC1_ON;
-    Audio_QueueSeqCmd(0x100100FF);
+    Audio_QueueSeqCmd(0x1 << 28 | SEQ_PLAYER_BGM_MAIN << 24 | 0x100FF);
     sCutsceneCamera = Gameplay_CreateSubCamera(globalCtx);
     Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_WAIT);
     Gameplay_ChangeCameraStatus(globalCtx, sCutsceneCamera, CAM_STAT_ACTIVE);
     Gameplay_CopyCamera(globalCtx, sCutsceneCamera, MAIN_CAM);
     func_8002DF54(globalCtx, &player->actor, 8);
     func_80064520(globalCtx, &globalCtx->csCtx);
-    Math_Vec3f_Copy(&sCameraEye, &ACTIVE_CAM->eye);
+    Math_Vec3f_Copy(&sCameraEye, &GET_ACTIVE_CAM(globalCtx)->eye);
     this->actionFunc = BossSst_HeadDeath;
 }
 
@@ -1037,15 +1037,15 @@ void BossSst_HeadDeath(BossSst* this, GlobalContext* globalCtx) {
         Gameplay_CameraSetAtEye(globalCtx, sCutsceneCamera, &this->actor.focus.pos, &sCameraEye);
         Math_StepToF(&this->radius, -350.0f, 10.0f);
     } else if (this->timer == 48) {
-        Player* player = PLAYER;
+        Player* player = GET_PLAYER(globalCtx);
 
         player->actor.world.pos.x = sRoomCenter.x + (400.0f * Math_SinS(this->actor.shape.rot.y)) +
                                     (Math_CosS(this->actor.shape.rot.y) * -120.0f);
         player->actor.world.pos.z = sRoomCenter.z + (400.0f * Math_CosS(this->actor.shape.rot.y)) -
                                     (Math_SinS(this->actor.shape.rot.y) * -120.0f);
         player->actor.shape.rot.y = Actor_WorldYawTowardPoint(&player->actor, &sRoomCenter);
-        func_8002DBD0(&this->actor, &sCameraEye, &globalCtx->cameraPtrs[globalCtx->activeCamera]->eye);
-        func_8002DBD0(&this->actor, &sCameraAt, &globalCtx->cameraPtrs[globalCtx->activeCamera]->at);
+        func_8002DBD0(&this->actor, &sCameraEye, &GET_ACTIVE_CAM(globalCtx)->eye);
+        func_8002DBD0(&this->actor, &sCameraAt, &GET_ACTIVE_CAM(globalCtx)->at);
         this->radius = -350.0f;
         this->actor.world.pos.x = sRoomCenter.x - (Math_SinS(this->actor.shape.rot.y) * 350.0f);
         this->actor.world.pos.z = sRoomCenter.z - (Math_CosS(this->actor.shape.rot.y) * 350.0f);
@@ -1154,9 +1154,9 @@ void BossSst_HeadMelt(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HeadSetupFinish(BossSst* this) {
-    this->actor.draw = BossSst_DrawEffect;
+    this->actor.draw = BossSst_DrawEffects;
     this->timer = 40;
-    Audio_QueueSeqCmd(0x21);
+    Audio_QueueSeqCmd(SEQ_PLAYER_BGM_MAIN << 24 | NA_BGM_BOSS_CLEAR);
     BossSst_SetCameraTargets(1.0 / 40, 6);
     this->actionFunc = BossSst_HeadFinish;
 }
@@ -1179,7 +1179,7 @@ void BossSst_HeadFinish(BossSst* this, GlobalContext* globalCtx) {
             Gameplay_ChangeCameraStatus(globalCtx, sCutsceneCamera, CAM_STAT_WAIT);
             Gameplay_ChangeCameraStatus(globalCtx, MAIN_CAM, CAM_STAT_ACTIVE);
             Gameplay_ClearCamera(globalCtx, sCutsceneCamera);
-            func_8002DF54(globalCtx, &PLAYER->actor, 7);
+            func_8002DF54(globalCtx, &GET_PLAYER(globalCtx)->actor, 7);
             func_80064534(globalCtx, &globalCtx->csCtx);
             Actor_Kill(&this->actor);
             Actor_Kill(&sHands[LEFT]->actor);
@@ -1188,7 +1188,7 @@ void BossSst_HeadFinish(BossSst* this, GlobalContext* globalCtx) {
         }
     } else if (this->effects[0].alpha == 0) {
         Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_DOOR_WARP1, ROOM_CENTER_X, ROOM_CENTER_Y, ROOM_CENTER_Z, 0,
-                    0, 0, -1);
+                    0, 0, WARP_DUNGEON_ADULT);
         Actor_Spawn(&globalCtx->actorCtx, globalCtx, ACTOR_ITEM_B_HEART,
                     (Math_SinS(this->actor.shape.rot.y) * 200.0f) + ROOM_CENTER_X, ROOM_CENTER_Y,
                     Math_CosS(this->actor.shape.rot.y) * 200.0f + ROOM_CENTER_Z, 0, 0, 0, 0);
@@ -1229,13 +1229,14 @@ void BossSst_HandWait(BossSst* this, GlobalContext* globalCtx) {
     Math_StepToF(&this->actor.world.pos.x, this->actor.home.pos.x, 1.0f);
     Math_StepToF(&this->actor.world.pos.z, this->actor.home.pos.z, 1.0f);
     if (HAND_STATE(OTHER_HAND(this)) == HAND_DAMAGED) {
-        Player* player = PLAYER;
+        Player* player = GET_PLAYER(globalCtx);
 
         if (this->timer != 0) {
             this->timer--;
         }
 
-        if ((this->timer == 0) && (player->actor.world.pos.y > -50.0f) && !(player->stateFlags1 & 0x6080)) {
+        if ((this->timer == 0) && (player->actor.world.pos.y > -50.0f) &&
+            !(player->stateFlags1 & (PLAYER_STATE1_7 | PLAYER_STATE1_13 | PLAYER_STATE1_14))) {
             BossSst_HandSelectAttack(this);
         }
     } else if (sHead->actionFunc == BossSst_HeadNeutral) {
@@ -1387,7 +1388,7 @@ void BossSst_HandSetupRetreat(BossSst* this) {
     Animation_MorphToPlayOnce(&this->skelAnime, sHandHangPoses[this->actor.params], 10.0f);
     this->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
     this->colliderJntSph.base.acFlags |= AC_ON;
-    this->actor.flags |= 1;
+    this->actor.flags |= ACTOR_FLAG_0;
     BossSst_HandSetInvulnerable(this, false);
     this->timer = 0;
     this->actionFunc = BossSst_HandRetreat;
@@ -1445,7 +1446,7 @@ void BossSst_HandReadySlam(BossSst* this, GlobalContext* globalCtx) {
             BossSst_HandSetupSlam(this);
         }
     } else {
-        Player* player = PLAYER;
+        Player* player = GET_PLAYER(globalCtx);
 
         if (Math_StepToF(&this->actor.world.pos.y, ROOM_CENTER_Y + 300.0f, 30.0f) &&
             (this->actor.xzDistToPlayer < 140.0f)) {
@@ -1503,7 +1504,7 @@ void BossSst_HandSlam(BossSst* this, GlobalContext* globalCtx) {
         }
 
         if (this->colliderJntSph.base.atFlags & AT_HIT) {
-            Player* player = PLAYER;
+            Player* player = GET_PLAYER(globalCtx);
 
             player->actor.world.pos.x = (Math_SinS(this->actor.yawTowardsPlayer) * 100.0f) + this->actor.world.pos.x;
             player->actor.world.pos.z = (Math_CosS(this->actor.yawTowardsPlayer) * 100.0f) + this->actor.world.pos.z;
@@ -1555,7 +1556,7 @@ void BossSst_HandSetupSweep(BossSst* this) {
 }
 
 void BossSst_HandSweep(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 newTargetYaw;
 
     SkelAnime_Update(&this->skelAnime);
@@ -1623,10 +1624,10 @@ void BossSst_HandPunch(BossSst* this, GlobalContext* globalCtx) {
 
     this->actor.world.pos.x += this->actor.speedXZ * Math_SinS(this->actor.shape.rot.y);
     this->actor.world.pos.z += this->actor.speedXZ * Math_CosS(this->actor.shape.rot.y);
-    if (this->actor.bgCheckFlags & 8) {
+    if (this->actor.bgCheckFlags & BGCHECKFLAG_WALL) {
         BossSst_HandSetupRetreat(this);
     } else if (this->colliderJntSph.base.atFlags & AT_HIT) {
-        func_8002F7DC(&PLAYER->actor, NA_SE_PL_BODY_HIT);
+        func_8002F7DC(&GET_PLAYER(globalCtx)->actor, NA_SE_PL_BODY_HIT);
         func_8002F71C(globalCtx, &this->actor, 10.0f, this->actor.shape.rot.y, 5.0f);
         BossSst_HandSetupRetreat(this);
     }
@@ -1690,7 +1691,7 @@ void BossSst_HandSetupClap(BossSst* this) {
 
 void BossSst_HandClap(BossSst* this, GlobalContext* globalCtx) {
     static s32 dropFlag = false;
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     SkelAnime_Update(&this->skelAnime);
     if (this->timer != 0) {
@@ -1718,7 +1719,7 @@ void BossSst_HandClap(BossSst* this, GlobalContext* globalCtx) {
         if (this->ready) {
             this->timer = 30;
             this->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
-            if (!(player->stateFlags2 & 0x80)) {
+            if (!(player->stateFlags2 & PLAYER_STATE2_7)) {
                 dropFlag = true;
             }
         } else {
@@ -1793,7 +1794,7 @@ void BossSst_HandSetupGrab(BossSst* this) {
 }
 
 void BossSst_HandGrab(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (this->timer != 0) {
         this->timer--;
@@ -1807,7 +1808,7 @@ void BossSst_HandGrab(BossSst* this, GlobalContext* globalCtx) {
         if (SkelAnime_Update(&this->skelAnime)) {
             this->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
             this->actor.speedXZ = 0.0f;
-            if (player->stateFlags2 & 0x80) {
+            if (player->stateFlags2 & PLAYER_STATE2_7) {
                 if (Rand_ZeroOne() < 0.5f) {
                     BossSst_HandSetupCrush(this);
                 } else {
@@ -1834,7 +1835,7 @@ void BossSst_HandGrab(BossSst* this, GlobalContext* globalCtx) {
 
     this->actor.world.pos.x += this->actor.speedXZ * Math_SinS(this->actor.world.rot.y);
     this->actor.world.pos.z += this->actor.speedXZ * Math_CosS(this->actor.world.rot.y);
-    if (player->stateFlags2 & 0x80) {
+    if (player->stateFlags2 & PLAYER_STATE2_7) {
         player->unk_850 = 0;
         player->actor.world.pos = this->actor.world.pos;
         player->actor.shape.rot.y = this->actor.shape.rot.y;
@@ -1848,21 +1849,21 @@ void BossSst_HandSetupCrush(BossSst* this) {
 }
 
 void BossSst_HandCrush(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     SkelAnime_Update(&this->skelAnime);
     if (this->timer != 0) {
         this->timer--;
     }
 
-    if (!(player->stateFlags2 & 0x80)) {
+    if (!(player->stateFlags2 & PLAYER_STATE2_7)) {
         BossSst_HandReleasePlayer(this, globalCtx, true);
         BossSst_HandSetupEndCrush(this);
     } else {
         player->actor.world.pos = this->actor.world.pos;
         if (this->timer == 0) {
             this->timer = 20;
-            if (LINK_IS_CHILD) {
+            if (!LINK_IS_ADULT) {
                 func_8002F7DC(&player->actor, NA_SE_VO_LI_DAMAGE_S_KID);
             } else {
                 func_8002F7DC(&player->actor, NA_SE_VO_LI_DAMAGE_S);
@@ -1897,7 +1898,7 @@ void BossSst_HandSetupSwing(BossSst* this) {
 }
 
 void BossSst_HandSwing(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     f32 offXZ;
 
     if (Math_ScaledStepToS(&this->actor.shape.rot.x, this->amplitude, this->timer * 0xE4 + 0x1C8)) {
@@ -1928,7 +1929,7 @@ void BossSst_HandSwing(BossSst* this, GlobalContext* globalCtx) {
         Math_ScaledStepToS(&this->actor.shape.rot.z, 0, 0x800);
     }
 
-    if (player->stateFlags2 & 0x80) {
+    if (player->stateFlags2 & PLAYER_STATE2_7) {
         player->unk_850 = 0;
         Math_Vec3f_Copy(&player->actor.world.pos, &this->actor.world.pos);
         player->actor.shape.rot.x = this->actor.shape.rot.x;
@@ -1941,7 +1942,7 @@ void BossSst_HandSwing(BossSst* this, GlobalContext* globalCtx) {
     }
 
     if ((this->timer == 4) && (this->amplitude == 0) && SkelAnime_Update(&this->skelAnime) &&
-        (player->stateFlags2 & 0x80)) {
+        (player->stateFlags2 & PLAYER_STATE2_7)) {
         BossSst_HandReleasePlayer(this, globalCtx, false);
         player->actor.world.pos.x += 70.0f * Math_SinS(this->actor.shape.rot.y);
         player->actor.world.pos.z += 70.0f * Math_CosS(this->actor.shape.rot.y);
@@ -2040,7 +2041,7 @@ void BossSst_HandShake(BossSst* this, GlobalContext* globalCtx) {
             this->timer = 80;
         }
     } else if (this->timer == 0) {
-        this->actor.flags |= 1;
+        this->actor.flags |= ACTOR_FLAG_0;
         BossSst_HandSetupSlam(this);
     }
 }
@@ -2068,7 +2069,7 @@ void BossSst_HandReadyCharge(BossSst* this, GlobalContext* globalCtx) {
         OTHER_HAND(this)->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
         sHead->colliderJntSph.base.atFlags &= ~(AT_ON | AT_HIT);
         func_8002F71C(globalCtx, &this->actor, 10.0f, this->actor.shape.rot.y, 5.0f);
-        func_8002F7DC(&PLAYER->actor, NA_SE_PL_BODY_HIT);
+        func_8002F7DC(&GET_PLAYER(globalCtx)->actor, NA_SE_PL_BODY_HIT);
     }
 }
 
@@ -2234,7 +2235,7 @@ void BossSst_HandMelt(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HandSetupFinish(BossSst* this) {
-    this->actor.draw = BossSst_DrawEffect;
+    this->actor.draw = BossSst_DrawEffects;
     this->timer = 20;
     this->effects[0].status = 0;
     this->actionFunc = BossSst_HandFinish;
@@ -2394,7 +2395,7 @@ void BossSst_HandBreakIce(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HandGrabPlayer(BossSst* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (globalCtx->grabPlayer(globalCtx, player)) {
         player->actor.parent = &this->actor;
@@ -2408,7 +2409,7 @@ void BossSst_HandGrabPlayer(BossSst* this, GlobalContext* globalCtx) {
 }
 
 void BossSst_HandReleasePlayer(BossSst* this, GlobalContext* globalCtx, s32 dropPlayer) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (player->actor.parent == &this->actor) {
         player->actor.parent = NULL;
@@ -2520,7 +2521,7 @@ void BossSst_HandCollisionCheck(BossSst* this, GlobalContext* globalCtx) {
                 BossSst_HandSetupRetreat(OTHER_HAND(this));
             }
 
-            this->actor.flags &= ~1;
+            this->actor.flags &= ~ACTOR_FLAG_0;
             if (this->actor.colChkInfo.damageEffect == 3) {
                 BossSst_HandSetupFrozen(this);
             } else {
@@ -2569,7 +2570,7 @@ void BossSst_HeadCollisionCheck(BossSst* this, GlobalContext* globalCtx) {
 
 void BossSst_UpdateHand(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
     BossSstHandTrail* trail;
 
     if (this->colliderCyl.base.atFlags & AT_ON) {
@@ -2584,7 +2585,8 @@ void BossSst_UpdateHand(Actor* thisx, GlobalContext* globalCtx) {
 
     BossSst_HandCollisionCheck(this, globalCtx);
     this->actionFunc(this, globalCtx);
-    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 130.0f, 0.0f, 5);
+    Actor_UpdateBgCheckInfo(globalCtx, &this->actor, 50.0f, 130.0f, 0.0f,
+                            UPDBGCHECKINFO_FLAG_0 | UPDBGCHECKINFO_FLAG_2);
     Actor_SetFocus(&this->actor, 0.0f);
     if (this->colliderJntSph.base.atFlags & AT_ON) {
         CollisionCheck_SetAT(globalCtx, &globalCtx->colChkCtx, &this->colliderJntSph.base);
@@ -2619,12 +2621,12 @@ void BossSst_UpdateHand(Actor* thisx, GlobalContext* globalCtx) {
     trail->yRotMod = this->handYRotMod;
 
     this->trailIndex = (this->trailIndex + 1) % 7;
-    BossSst_UpdateEffect(&this->actor, globalCtx);
+    BossSst_UpdateEffects(&this->actor, globalCtx);
 }
 
 void BossSst_UpdateHead(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     func_8002DBD0(&this->actor, &sHandOffsets[RIGHT], &sHands[RIGHT]->actor.world.pos);
     func_8002DBD0(&this->actor, &sHandOffsets[LEFT], &sHands[LEFT]->actor.world.pos);
@@ -2635,10 +2637,10 @@ void BossSst_UpdateHead(Actor* thisx, GlobalContext* globalCtx) {
     BossSst_HeadCollisionCheck(this, globalCtx);
     this->actionFunc(this, globalCtx);
     if (this->vVanish) {
-        if ((globalCtx->actorCtx.unk_03 == 0) || (thisx->colorFilterTimer != 0)) {
-            this->actor.flags &= ~0x80;
+        if (!globalCtx->actorCtx.lensActive || (thisx->colorFilterTimer != 0)) {
+            this->actor.flags &= ~ACTOR_FLAG_7;
         } else {
-            this->actor.flags |= 0x80;
+            this->actor.flags |= ACTOR_FLAG_7;
         }
     }
 
@@ -2658,25 +2660,25 @@ void BossSst_UpdateHead(Actor* thisx, GlobalContext* globalCtx) {
     }
 
     BossSst_MoveAround(this);
-    if ((!this->vVanish || ((this->actor.flags & 0x80) == 0x80)) &&
+    if ((!this->vVanish || CHECK_FLAG_ALL(this->actor.flags, ACTOR_FLAG_7)) &&
         ((this->actionFunc == BossSst_HeadReadyCharge) || (this->actionFunc == BossSst_HeadCharge) ||
          (this->actionFunc == BossSst_HeadFrozenHand) || (this->actionFunc == BossSst_HeadStunned) ||
          (this->actionFunc == BossSst_HeadVulnerable) || (this->actionFunc == BossSst_HeadDamage))) {
-        this->actor.flags |= 1;
+        this->actor.flags |= ACTOR_FLAG_0;
     } else {
-        this->actor.flags &= ~1;
+        this->actor.flags &= ~ACTOR_FLAG_0;
     }
 
     if (this->actionFunc == BossSst_HeadCharge) {
         BossSst_HeadSfx(this, NA_SE_EN_SHADEST_MOVE - SFX_FLAG);
     }
 
-    BossSst_UpdateEffect(&this->actor, globalCtx);
+    BossSst_UpdateEffects(&this->actor, globalCtx);
 }
 
 s32 BossSst_OverrideHandDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot,
                              void* thisx) {
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     if (limbIndex == 1) {
         pos->z += this->handZPosMod;
@@ -2686,7 +2688,7 @@ s32 BossSst_OverrideHandDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dLis
 }
 
 void BossSst_PostHandDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     Collider_UpdateSpheres(limbIndex, &this->colliderJntSph);
 }
@@ -2703,7 +2705,7 @@ s32 BossSst_OverrideHandTrailDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx**
 }
 
 void BossSst_DrawHand(Actor* thisx, GlobalContext* globalCtx) {
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_boss_sst.c", 6563);
 
@@ -2736,8 +2738,9 @@ void BossSst_DrawHand(Actor* thisx, GlobalContext* globalCtx) {
         trail2 = &this->handTrails[(idx + 2) % 7];
 
         for (i = 0; i < end; i++) {
-            if (Math3D_Vec3fDistSq(&trail2->world.pos, &trail->world.pos) > 900.0f) {
-                func_800D1694(trail->world.pos.x, trail->world.pos.y, trail->world.pos.z, &trail->world.rot);
+            if (Math3D_Vec3fDistSq(&trail2->world.pos, &trail->world.pos) > SQ(30.0f)) {
+                Matrix_SetTranslateRotateYXZ(trail->world.pos.x, trail->world.pos.y, trail->world.pos.z,
+                                             &trail->world.rot);
                 Matrix_Scale(0.02f, 0.02f, 0.02f, MTXMODE_APPLY);
 
                 gSPSegment(POLY_XLU_DISP++, 0x08, sHandTrailDList);
@@ -2756,18 +2759,18 @@ void BossSst_DrawHand(Actor* thisx, GlobalContext* globalCtx) {
 
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_boss_sst.c", 6654);
 
-    BossSst_DrawEffect(&this->actor, globalCtx);
+    BossSst_DrawEffects(&this->actor, globalCtx);
 }
 
 s32 BossSst_OverrideHeadDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx,
                              Gfx** gfx) {
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
     s32 shakeAmp;
     s32 pad;
     s32 timer12;
     f32 shakeMod;
 
-    if (((this->actor.flags & 0x80) != 0x80) && this->vVanish) {
+    if (!CHECK_FLAG_ALL(this->actor.flags, ACTOR_FLAG_7) && this->vVanish) {
         *dList = NULL;
     } else if (this->actionFunc == BossSst_HeadThrash) { // Animation modifications for death cutscene
         shakeAmp = (this->timer / 10) + 1;
@@ -2838,7 +2841,7 @@ s32 BossSst_OverrideHeadDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dLis
 void BossSst_PostHeadDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx, Gfx** gfx) {
     static Vec3f zeroVec = { 0.0f, 0.0f, 0.0f };
     static Vec3f headVec = { 1000.0f, 0.0f, 0.0f };
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
     Vec3f headPos;
 
     if (limbIndex == 8) {
@@ -2854,11 +2857,11 @@ void BossSst_PostHeadDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, 
 
 void BossSst_DrawHead(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_boss_sst.c", 6810);
 
-    if ((this->actor.flags & 0x80) != 0x80) {
+    if (!CHECK_FLAG_ALL(this->actor.flags, ACTOR_FLAG_7)) {
         func_80093D18(globalCtx->state.gfxCtx);
         gDPSetPrimColor(POLY_OPA_DISP++, 0x00, 0x80, sBodyColor.r, sBodyColor.g, sBodyColor.b, 255);
         if (!sBodyStatic) {
@@ -2885,7 +2888,7 @@ void BossSst_DrawHead(Actor* thisx, GlobalContext* globalCtx) {
         Matrix_RotateY(-randYaw, MTXMODE_APPLY);
     }
 
-    if ((this->actor.flags & 0x80) != 0x80) {
+    if (!CHECK_FLAG_ALL(this->actor.flags, ACTOR_FLAG_7)) {
         POLY_OPA_DISP = SkelAnime_DrawFlex(globalCtx, this->skelAnime.skeleton, this->skelAnime.jointTable,
                                            this->skelAnime.dListCount, BossSst_OverrideHeadDraw, BossSst_PostHeadDraw,
                                            this, POLY_OPA_DISP);
@@ -2911,7 +2914,7 @@ void BossSst_DrawHead(Actor* thisx, GlobalContext* globalCtx) {
             vanishMaskPos.y = 450.0f;
         }
 
-        Matrix_MultVec3fExt(&vanishMaskPos, &vanishMaskOffset, &globalCtx->mf_11DA0);
+        Matrix_MultVec3fExt(&vanishMaskPos, &vanishMaskOffset, &globalCtx->billboardMtxF);
         Matrix_Translate(this->actor.world.pos.x + vanishMaskOffset.x, this->actor.world.pos.y + vanishMaskOffset.y,
                          this->actor.world.pos.z + vanishMaskOffset.z, MTXMODE_NEW);
         Matrix_Scale(1.0f, 1.0f, 1.0f, MTXMODE_APPLY);
@@ -2923,8 +2926,8 @@ void BossSst_DrawHead(Actor* thisx, GlobalContext* globalCtx) {
 
     CLOSE_DISPS(globalCtx->state.gfxCtx, "../z_boss_sst.c", 6941);
 
-    SkinMatrix_Vec3fMtxFMultXYZ(&globalCtx->mf_11D60, &this->actor.focus.pos, &this->center);
-    BossSst_DrawEffect(&this->actor, globalCtx);
+    SkinMatrix_Vec3fMtxFMultXYZ(&globalCtx->viewProjectionMtxF, &this->actor.focus.pos, &this->center);
+    BossSst_DrawEffects(&this->actor, globalCtx);
 }
 
 void BossSst_SpawnHeadShadow(BossSst* this) {
@@ -3083,8 +3086,8 @@ void BossSst_IceShatter(BossSst* this) {
     }
 }
 
-void BossSst_UpdateEffect(Actor* thisx, GlobalContext* globalCtx) {
-    BossSst* this = THIS;
+void BossSst_UpdateEffects(Actor* thisx, GlobalContext* globalCtx) {
+    BossSst* this = (BossSst*)thisx;
     BossSstEffect* effect;
     s32 i;
 
@@ -3127,7 +3130,7 @@ void BossSst_UpdateEffect(Actor* thisx, GlobalContext* globalCtx) {
             effect = &this->effects[0];
 
             if (this->actor.params == BONGO_HEAD) {
-                SkinMatrix_Vec3fMtxFMultXYZ(&globalCtx->mf_11D60, &this->actor.focus.pos, &this->center);
+                SkinMatrix_Vec3fMtxFMultXYZ(&globalCtx->viewProjectionMtxF, &this->actor.focus.pos, &this->center);
                 BossSst_HeadSfx(this, NA_SE_EN_SHADEST_LAST - SFX_FLAG);
             }
             while (effect->status != -1) {
@@ -3144,9 +3147,9 @@ void BossSst_UpdateEffect(Actor* thisx, GlobalContext* globalCtx) {
     }
 }
 
-void BossSst_DrawEffect(Actor* thisx, GlobalContext* globalCtx) {
+void BossSst_DrawEffects(Actor* thisx, GlobalContext* globalCtx) {
     s32 pad;
-    BossSst* this = THIS;
+    BossSst* this = (BossSst*)thisx;
     s32 i;
     BossSstEffect* effect;
 
@@ -3173,7 +3176,7 @@ void BossSst_DrawEffect(Actor* thisx, GlobalContext* globalCtx) {
                                          effect->pos.z + this->actor.world.pos.z, MTXMODE_NEW);
                     }
 
-                    Matrix_RotateRPY(effect->rot.x, effect->rot.y, effect->rot.z, MTXMODE_APPLY);
+                    Matrix_RotateZYX(effect->rot.x, effect->rot.y, effect->rot.z, MTXMODE_APPLY);
                     Matrix_Scale(effect->scale * 0.001f, effect->scale * 0.001f, effect->scale * 0.001f, MTXMODE_APPLY);
 
                     gSPMatrix(POLY_XLU_DISP++, Matrix_NewMtx(globalCtx->state.gfxCtx, "../z_boss_sst.c", 7350),

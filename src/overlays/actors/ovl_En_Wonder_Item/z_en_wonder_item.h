@@ -1,5 +1,5 @@
-#ifndef _Z_EN_WONDER_ITEM_H_
-#define _Z_EN_WONDER_ITEM_H_
+#ifndef Z_EN_WONDER_ITEM_H
+#define Z_EN_WONDER_ITEM_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -11,7 +11,7 @@ typedef void (*EnWonderItemUpdateFunc)(struct EnWonderItem*, GlobalContext*);
 typedef struct EnWonderItem {
     /* 0x0000 */ Actor actor;
     /* 0x014C */ EnWonderItemUpdateFunc updateFunc;
-    /* 0x0150 */ f32 unkHeight; // sets height of dummied out mode 4 
+    /* 0x0150 */ f32 unkHeight; // sets height of dummied out mode 4
     /* 0x0154 */ s16 wonderMode;
     /* 0x0156 */ s16 itemDrop;
     /* 0x0158 */ s16 numTagPoints;
@@ -57,7 +57,5 @@ typedef enum {
     /* B */ WONDERITEM_DROP_FLEXIBLE,
     /* C */ WONDERITEM_DROP_RANDOM
 } EnWonderItemDrop;
-
-extern const ActorInit En_Wonder_Item_InitVars;
 
 #endif

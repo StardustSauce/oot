@@ -66,6 +66,7 @@ s16 Quake_Callback1(QuakeRequest* req, ShakeInfo* shake) {
 
     if (req->countdown > 0) {
         f32 a = Math_SinS(req->speed * req->countdown);
+
         Quake_UpdateShakeInfo(req, shake, a, Rand_ZeroOne() * a);
         req->countdown--;
     }
@@ -75,6 +76,7 @@ s16 Quake_Callback1(QuakeRequest* req, ShakeInfo* shake) {
 s16 Quake_Callback5(QuakeRequest* req, ShakeInfo* shake) {
     if (req->countdown > 0) {
         f32 a = Math_SinS(req->speed * req->countdown);
+
         Quake_UpdateShakeInfo(req, shake, a, a);
         req->countdown--;
     }
@@ -94,6 +96,7 @@ s16 Quake_Callback6(QuakeRequest* req, ShakeInfo* shake) {
 s16 Quake_Callback3(QuakeRequest* req, ShakeInfo* shake) {
     if (req->countdown > 0) {
         f32 a = Math_SinS(req->speed * req->countdown) * ((f32)req->countdown / (f32)req->countdownMax);
+
         Quake_UpdateShakeInfo(req, shake, a, a);
         req->countdown--;
     }
@@ -103,6 +106,7 @@ s16 Quake_Callback3(QuakeRequest* req, ShakeInfo* shake) {
 s16 Quake_Callback2(QuakeRequest* req, ShakeInfo* shake) {
     if (req->countdown > 0) {
         f32 a = Rand_ZeroOne();
+
         Quake_UpdateShakeInfo(req, shake, a, Rand_ZeroOne() * a);
         req->countdown--;
     }
@@ -112,6 +116,7 @@ s16 Quake_Callback2(QuakeRequest* req, ShakeInfo* shake) {
 s16 Quake_Callback4(QuakeRequest* req, ShakeInfo* shake) {
     if (req->countdown > 0) {
         f32 a = Rand_ZeroOne() * ((f32)req->countdown / (f32)req->countdownMax);
+
         Quake_UpdateShakeInfo(req, shake, a, Rand_ZeroOne() * a);
         req->countdown--;
     }
@@ -147,7 +152,7 @@ QuakeRequest* Quake_AddImpl(Camera* cam, u32 callbackIdx) {
     s16 idx = Quake_GetFreeIndex();
     QuakeRequest* req = &sQuakeRequest[idx];
 
-    func_80106860(req, 0, sizeof(QuakeRequest)); // memset
+    __osMemset(req, 0, sizeof(QuakeRequest));
     req->cam = cam;
     req->camPtrIdx = cam->thisIdx;
     req->callbackIdx = callbackIdx;

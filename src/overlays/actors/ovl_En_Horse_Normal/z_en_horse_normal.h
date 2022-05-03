@@ -1,5 +1,5 @@
-#ifndef _Z_EN_HORSE_NORMAL_H_
-#define _Z_EN_HORSE_NORMAL_H_
+#ifndef Z_EN_HORSE_NORMAL_H
+#define Z_EN_HORSE_NORMAL_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -12,7 +12,7 @@ typedef struct EnHorseNormal {
     /* 0x0000 */ Actor actor;
     /* 0x014C */ s32 action;
     /* 0x0150 */ s32 animationIdx;
-    /* 0x0154 */ PSkinAwb skin;
+    /* 0x0154 */ Skin skin;
     /* 0x01E4 */ u16 unk_1E4;
     /* 0x01E8 */ Vec3f unk_1E8;
     /* 0x01F4 */ Vec3f unk_1F4;
@@ -31,7 +31,5 @@ typedef struct EnHorseNormal {
     /* 0x0320 */ char unk_320[0x04];
     /* 0x0324 */ s32 waypoint;
 } EnHorseNormal; // size = 0x0328
-
-extern const ActorInit En_Horse_Normal_InitVars;
 
 #endif

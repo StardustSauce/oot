@@ -1,5 +1,5 @@
-#ifndef _Z_EN_BB_H_
-#define _Z_EN_BB_H_
+#ifndef Z_EN_BB_H
+#define Z_EN_BB_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -39,7 +39,7 @@ typedef struct EnBb {
     /* 0x02A0 */ Color_RGB8 flameEnvColor;
     /* 0x02A4 */ s32 blureIdx;
     /* 0x02A8 */ s16 fireIceTimer;
-    /* 0x02AA */ u8 dmgEffect;  
+    /* 0x02AA */ u8 dmgEffect;
     /* 0x02AC */ ColliderJntSph collider;
     /* 0x02CC */ ColliderJntSphElement elements[1];
     /* 0x030C */ BodyBreak bodyBreak;
@@ -55,7 +55,5 @@ typedef enum {
     ENBB_FLAME_TRAIL,
     ENBB_KILL_TRAIL = 11
 } EnBbType;
-
-extern const ActorInit En_Bb_InitVars;
 
 #endif

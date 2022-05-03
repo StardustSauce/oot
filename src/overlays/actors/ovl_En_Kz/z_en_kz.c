@@ -5,10 +5,9 @@
  */
 
 #include "z_en_kz.h"
+#include "objects/object_kz/object_kz.h"
 
-#define FLAGS 0x00000009
-
-#define THIS ((EnKz*)thisx)
+#define FLAGS (ACTOR_FLAG_0 | ACTOR_FLAG_3)
 
 void EnKz_Init(Actor* thisx, GlobalContext* globalCtx);
 void EnKz_Destroy(Actor* thisx, GlobalContext* globalCtx);
@@ -57,20 +56,24 @@ static ColliderCylinderInit sCylinderInit = {
 
 static CollisionCheckInfoInit2 sColChkInfoInit = { 0, 0, 0, 0, MASS_IMMOVABLE };
 
-static struct_80034EC0_Entry sAnimations[] = {
-    { 0x0600075C, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, 0.0f },
-    { 0x0600075C, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, -10.0f },
-    { 0x0600046C, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, -10.0f },
+typedef enum {
+    /* 0 */ ENKZ_ANIM_0,
+    /* 1 */ ENKZ_ANIM_1,
+    /* 2 */ ENKZ_ANIM_2
+} EnKzAnimation;
+
+static AnimationInfo sAnimationInfo[] = {
+    { &gKzIdleAnim, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, 0.0f },
+    { &gKzIdleAnim, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, -10.0f },
+    { &gKzMweepAnim, 1.0f, 0.0f, -1.0f, ANIMMODE_LOOP, -10.0f },
 };
 
-extern FlexSkeletonHeader D_060086D0;
-
 u16 EnKz_GetTextNoMaskChild(GlobalContext* globalCtx, EnKz* this) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (CHECK_QUEST_ITEM(QUEST_ZORA_SAPPHIRE)) {
         return 0x402B;
-    } else if (gSaveContext.eventChkInf[3] & 8) {
+    } else if (GET_EVENTCHKINF(EVENTCHKINF_33)) {
         return 0x401C;
     } else {
         player->exchangeItemId = EXCH_ITEM_LETTER_RUTO;
@@ -79,11 +82,11 @@ u16 EnKz_GetTextNoMaskChild(GlobalContext* globalCtx, EnKz* this) {
 }
 
 u16 EnKz_GetTextNoMaskAdult(GlobalContext* globalCtx, EnKz* this) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (INV_CONTENT(ITEM_TRADE_ADULT) >= ITEM_FROG) {
-        if (!(gSaveContext.infTable[19] & 0x200)) {
-            if (CHECK_OWNED_EQUIP(EQUIP_TUNIC, 2)) {
+        if (!GET_INFTABLE(INFTABLE_139)) {
+            if (CHECK_OWNED_EQUIP(EQUIP_TYPE_TUNIC, EQUIP_INV_TUNIC_ZORA)) {
                 return 0x401F;
             } else {
                 return 0x4012;
@@ -98,7 +101,7 @@ u16 EnKz_GetTextNoMaskAdult(GlobalContext* globalCtx, EnKz* this) {
 }
 
 u16 EnKz_GetText(GlobalContext* globalCtx, Actor* thisx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
     u16 reactionText = Text_GetFaceReaction(globalCtx, 0x1E);
 
     if (reactionText != 0) {
@@ -113,39 +116,40 @@ u16 EnKz_GetText(GlobalContext* globalCtx, Actor* thisx) {
 }
 
 s16 func_80A9C6C0(GlobalContext* globalCtx, Actor* thisx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
     s16 ret = 1;
 
-    switch (func_8010BDBC(&globalCtx->msgCtx)) {
-        case 6:
+    switch (Message_GetState(&globalCtx->msgCtx)) {
+        case TEXT_STATE_DONE:
             ret = 0;
             switch (this->actor.textId) {
                 case 0x4012:
-                    gSaveContext.infTable[19] |= 0x200;
+                    SET_INFTABLE(INFTABLE_139);
                     ret = 2;
                     break;
                 case 0x401B:
-                    ret = func_80106BC8(globalCtx) == 0 ? 1 : 2;
+                    ret = !Message_ShouldAdvance(globalCtx) ? 1 : 2;
                     break;
                 case 0x401F:
-                    gSaveContext.infTable[19] |= 0x200;
+                    SET_INFTABLE(INFTABLE_139);
                     break;
             }
             break;
-        case 3:
+        case TEXT_STATE_DONE_FADING:
             if (this->actor.textId != 0x4014) {
                 if (this->actor.textId == 0x401B && !this->sfxPlayed) {
-                    Audio_PlaySoundGeneral(NA_SE_SY_CORRECT_CHIME, &D_801333D4, 4, &D_801333E0, &D_801333E0,
-                                           &D_801333E8);
+                    Audio_PlaySoundGeneral(NA_SE_SY_CORRECT_CHIME, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                           &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                     this->sfxPlayed = true;
                 }
             } else if (!this->sfxPlayed) {
-                Audio_PlaySoundGeneral(NA_SE_SY_TRE_BOX_APPEAR, &D_801333D4, 4, &D_801333E0, &D_801333E0, &D_801333E8);
+                Audio_PlaySoundGeneral(NA_SE_SY_TRE_BOX_APPEAR, &gSfxDefaultPos, 4, &gSfxDefaultFreqAndVolScale,
+                                       &gSfxDefaultFreqAndVolScale, &gSfxDefaultReverb);
                 this->sfxPlayed = true;
             }
             break;
-        case 4:
-            if (func_80106BC8(globalCtx) == 0) {
+        case TEXT_STATE_CHOICE:
+            if (!Message_ShouldAdvance(globalCtx)) {
                 break;
             }
             if (this->actor.textId == 0x4014) {
@@ -154,21 +158,21 @@ s16 func_80A9C6C0(GlobalContext* globalCtx, Actor* thisx) {
                     ret = 2;
                 } else {
                     this->actor.textId = 0x4016;
-                    func_8010B720(globalCtx, this->actor.textId);
+                    Message_ContinueTextbox(globalCtx, this->actor.textId);
                 }
             }
             break;
-        case 5:
-            if (func_80106BC8(globalCtx) != 0) {
+        case TEXT_STATE_EVENT:
+            if (Message_ShouldAdvance(globalCtx)) {
                 ret = 2;
             }
             break;
-        case 0:
-        case 1:
-        case 2:
-        case 7:
-        case 8:
-        case 9:
+        case TEXT_STATE_NONE:
+        case TEXT_STATE_DONE_HAS_NEXT:
+        case TEXT_STATE_CLOSING:
+        case TEXT_STATE_SONG_DEMO_DONE:
+        case TEXT_STATE_8:
+        case TEXT_STATE_9:
             break;
     }
     return ret;
@@ -186,13 +190,13 @@ void EnKz_UpdateEyes(EnKz* this) {
 
 s32 func_80A9C95C(GlobalContext* globalCtx, EnKz* this, s16* arg2, f32 unkf, callback1_800343CC callback1,
                   callback2_800343CC callback2) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
     s16 sp32;
     s16 sp30;
     f32 xzDistToPlayer;
     f32 yaw;
 
-    if (func_8002F194(&this->actor, globalCtx) != 0) {
+    if (Actor_ProcessTalkRequest(&this->actor, globalCtx)) {
         *arg2 = 1;
         return 1;
     }
@@ -205,13 +209,13 @@ s32 func_80A9C95C(GlobalContext* globalCtx, EnKz* this, s16* arg2, f32 unkf, cal
     yaw = Math_Vec3f_Yaw(&this->actor.home.pos, &player->actor.world.pos);
     yaw -= this->actor.shape.rot.y;
     if ((fabsf(yaw) > 1638.0f) || (this->actor.xzDistToPlayer < 265.0f)) {
-        this->actor.flags &= ~1;
+        this->actor.flags &= ~ACTOR_FLAG_0;
         return 0;
     }
 
-    this->actor.flags |= 1;
+    this->actor.flags |= ACTOR_FLAG_0;
 
-    func_8002F374(globalCtx, &this->actor, &sp32, &sp30);
+    Actor_GetScreenPos(globalCtx, &this->actor, &sp32, &sp30);
     if (!((sp32 >= -30) && (sp32 < 361) && (sp30 >= -10) && (sp30 < 241))) {
         return 0;
     }
@@ -229,10 +233,10 @@ s32 func_80A9C95C(GlobalContext* globalCtx, EnKz* this, s16* arg2, f32 unkf, cal
 }
 
 void func_80A9CB18(EnKz* this, GlobalContext* globalCtx) {
-    Player* player = PLAYER;
+    Player* player = GET_PLAYER(globalCtx);
 
     if (func_80A9C95C(globalCtx, this, &this->unk_1E0.unk_00, 340.0f, EnKz_GetText, func_80A9C6C0)) {
-        if ((this->actor.textId == 0x401A) && !(gSaveContext.eventChkInf[3] & 8)) {
+        if ((this->actor.textId == 0x401A) && !GET_EVENTCHKINF(EVENTCHKINF_33)) {
             if (func_8002F368(globalCtx) == EXCH_ITEM_LETTER_RUTO) {
                 this->actor.textId = 0x401B;
                 this->sfxPlayed = false;
@@ -254,11 +258,11 @@ void func_80A9CB18(EnKz* this, GlobalContext* globalCtx) {
             }
 
             this->isTrading = false;
-            if (gSaveContext.infTable[19] & 0x200) {
+            if (GET_INFTABLE(INFTABLE_139)) {
                 this->actor.textId = CHECK_QUEST_ITEM(QUEST_SONG_SERENADE) ? 0x4045 : 0x401A;
                 player->actor.textId = this->actor.textId;
             } else {
-                this->actor.textId = CHECK_OWNED_EQUIP(EQUIP_TUNIC, 2) ? 0x401F : 0x4012;
+                this->actor.textId = CHECK_OWNED_EQUIP(EQUIP_TYPE_TUNIC, EQUIP_INV_TUNIC_ZORA) ? 0x401F : 0x4012;
                 player->actor.textId = this->actor.textId;
             }
         }
@@ -281,7 +285,7 @@ s32 EnKz_FollowPath(EnKz* this, GlobalContext* globalCtx) {
 
     pathDiffX = pointPos->x - this->actor.world.pos.x;
     pathDiffZ = pointPos->z - this->actor.world.pos.z;
-    Math_SmoothStepToS(&this->actor.world.rot.y, (Math_FAtan2F(pathDiffX, pathDiffZ) * (0x8000 / M_PI)), 0xA, 0x3E8, 1);
+    Math_SmoothStepToS(&this->actor.world.rot.y, RAD_TO_BINANG(Math_FAtan2F(pathDiffX, pathDiffZ)), 0xA, 0x3E8, 1);
 
     if ((SQ(pathDiffX) + SQ(pathDiffZ)) < 10.0f) {
         this->waypoint++;
@@ -313,10 +317,10 @@ s32 EnKz_SetMovedPos(EnKz* this, GlobalContext* globalCtx) {
 }
 
 void EnKz_Init(Actor* thisx, GlobalContext* globalCtx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
     s32 pad;
 
-    SkelAnime_InitFlex(globalCtx, &this->skelanime, &D_060086D0, NULL, this->jointTable, this->morphTable, 12);
+    SkelAnime_InitFlex(globalCtx, &this->skelanime, &gKzSkel, NULL, this->jointTable, this->morphTable, 12);
     ActorShape_Init(&this->actor.shape, 0.0, NULL, 0.0);
     Collider_InitCylinder(globalCtx, &this->collider);
     Collider_SetCylinder(globalCtx, &this->collider, &this->actor, &sCylinderInit);
@@ -324,14 +328,14 @@ void EnKz_Init(Actor* thisx, GlobalContext* globalCtx) {
     Actor_SetScale(&this->actor, 0.01);
     this->actor.targetMode = 3;
     this->unk_1E0.unk_00 = 0;
-    func_80034EC0(&this->skelanime, sAnimations, 0);
+    Animation_ChangeByInfo(&this->skelanime, sAnimationInfo, ENKZ_ANIM_0);
 
-    if (gSaveContext.eventChkInf[3] & 8) {
+    if (GET_EVENTCHKINF(EVENTCHKINF_33)) {
         EnKz_SetMovedPos(this, globalCtx);
     }
 
     if (LINK_IS_ADULT) {
-        if (!(gSaveContext.infTable[19] & 0x100)) {
+        if (!GET_INFTABLE(INFTABLE_138)) {
             Actor_SpawnAsChild(&globalCtx->actorCtx, &this->actor, globalCtx, ACTOR_BG_ICE_SHELTER,
                                this->actor.world.pos.x, this->actor.world.pos.y, this->actor.world.pos.z, 0, 0, 0,
                                0x04FF);
@@ -343,14 +347,14 @@ void EnKz_Init(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 void EnKz_Destroy(Actor* thisx, GlobalContext* globalCtx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
 
     Collider_DestroyCylinder(globalCtx, &this->collider);
 }
 
 void EnKz_PreMweepWait(EnKz* this, GlobalContext* globalCtx) {
     if (this->unk_1E0.unk_00 == 2) {
-        func_80034EC0(&this->skelanime, sAnimations, 2);
+        Animation_ChangeByInfo(&this->skelanime, sAnimationInfo, ENKZ_ANIM_2);
         this->unk_1E0.unk_00 = 0;
         this->actionFunc = EnKz_SetupMweep;
     } else {
@@ -390,10 +394,10 @@ void EnKz_Mweep(EnKz* this, GlobalContext* globalCtx) {
     initPos.z += 260.0f;
     Gameplay_CameraSetAtEye(globalCtx, this->cutsceneCamera, &pos, &initPos);
     if ((EnKz_FollowPath(this, globalCtx) == 1) && (this->waypoint == 0)) {
-        func_80034EC0(&this->skelanime, sAnimations, 1);
+        Animation_ChangeByInfo(&this->skelanime, sAnimationInfo, ENKZ_ANIM_1);
         Inventory_ReplaceItem(globalCtx, ITEM_LETTER_RUTO, ITEM_BOTTLE);
         EnKz_SetMovedPos(this, globalCtx);
-        gSaveContext.eventChkInf[3] |= 8;
+        SET_EVENTCHKINF(EVENTCHKINF_33);
         this->actor.speedXZ = 0.0;
         this->actionFunc = EnKz_StopMweep;
     }
@@ -436,10 +440,10 @@ void EnKz_SetupGetItem(EnKz* this, GlobalContext* globalCtx) {
 }
 
 void EnKz_StartTimer(EnKz* this, GlobalContext* globalCtx) {
-    if ((func_8010BDBC(&globalCtx->msgCtx) == 6) && (func_80106BC8(globalCtx))) {
+    if ((Message_GetState(&globalCtx->msgCtx) == TEXT_STATE_DONE) && Message_ShouldAdvance(globalCtx)) {
         if (INV_CONTENT(ITEM_TRADE_ADULT) == ITEM_FROG) {
             func_80088AA0(180); // start timer2 with 3 minutes
-            gSaveContext.eventInf[1] &= ~1;
+            CLEAR_EVENTINF(EVENTINF_10);
         }
         this->unk_1E0.unk_00 = 0;
         this->actionFunc = EnKz_Wait;
@@ -447,11 +451,11 @@ void EnKz_StartTimer(EnKz* this, GlobalContext* globalCtx) {
 }
 
 void EnKz_Update(Actor* thisx, GlobalContext* globalCtx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
     s32 pad;
 
-    if (LINK_IS_ADULT && !(gSaveContext.infTable[19] & 0x100)) {
-        gSaveContext.infTable[19] |= 0x100;
+    if (LINK_IS_ADULT && !GET_INFTABLE(INFTABLE_138)) {
+        SET_INFTABLE(INFTABLE_138);
     }
     Collider_UpdateCylinder(&this->actor, &this->collider);
     CollisionCheck_SetOC(globalCtx, &globalCtx->colChkCtx, &this->collider.base);
@@ -465,7 +469,7 @@ void EnKz_Update(Actor* thisx, GlobalContext* globalCtx) {
 }
 
 s32 EnKz_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, void* thisx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
 
     if (limbIndex == 8 || limbIndex == 9 || limbIndex == 10) {
         rot->y += Math_SinS(this->unk_2A6[limbIndex]) * 200.0f;
@@ -476,7 +480,7 @@ s32 EnKz_OverrideLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, 
 }
 
 void EnKz_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec3s* rot, void* thisx) {
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
     Vec3f mult = { 2600.0f, 0.0f, 0.0f };
 
     if (limbIndex == 11) {
@@ -485,12 +489,12 @@ void EnKz_PostLimbDraw(GlobalContext* globalCtx, s32 limbIndex, Gfx** dList, Vec
 }
 
 void EnKz_Draw(Actor* thisx, GlobalContext* globalCtx) {
-    static UNK_PTR sEyeSegments[] = {
-        0x06001470,
-        0x06001870,
-        0x06001C70,
+    static void* sEyeSegments[] = {
+        gKzEyeOpenTex,
+        gKzEyeHalfTex,
+        gKzEyeClosedTex,
     };
-    EnKz* this = THIS;
+    EnKz* this = (EnKz*)thisx;
 
     OPEN_DISPS(globalCtx->state.gfxCtx, "../z_en_kz.c", 1259);
 

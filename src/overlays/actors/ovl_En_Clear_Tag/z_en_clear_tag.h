@@ -1,5 +1,5 @@
-#ifndef _Z_EN_CLEAR_TAG_H_
-#define _Z_EN_CLEAR_TAG_H_
+#ifndef Z_EN_CLEAR_TAG_H
+#define Z_EN_CLEAR_TAG_H
 
 #include "ultra64.h"
 #include "global.h"
@@ -72,6 +72,8 @@ typedef struct EnClearTag {
     /* 0x01FE */ char unk_1FE[0x06];
 } EnClearTag; // size = 0x0204
 
+#define CLEAR_TAG_EFFECT_COUNT 100
+
 typedef struct EnClearTagEffect {
     /* 0x0000 */ u8 type;
     /* 0x0001 */ u8 random;
@@ -89,9 +91,5 @@ typedef struct EnClearTagEffect {
     /* 0x005C */ f32 floorHeight;
     /* 0x0060 */ Vec3f floorTangent;
 } EnClearTagEffect; // size = 0x6C
-
-#define CLEAR_TAG_EFFECT_MAX_COUNT 100
-
-extern const ActorInit En_Clear_Tag_InitVars;
 
 #endif
